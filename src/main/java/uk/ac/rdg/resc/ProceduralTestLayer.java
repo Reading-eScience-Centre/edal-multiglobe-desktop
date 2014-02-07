@@ -48,7 +48,7 @@ public class ProceduralTestLayer extends ProceduralTiledImageLayer {
     public ProceduralTestLayer(String layerName, FeatureCatalogue catalogue, float min, float max) {
         super(makeLevels(layerName));
         this.catalogue = catalogue;
-
+        setName("edal-layer");
         this.setUseTransparentTextures(true);
 
         ColourScheme colourScheme = new PaletteColourScheme(new ColourScale(min, max, false),
