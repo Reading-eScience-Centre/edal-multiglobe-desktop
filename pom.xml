@@ -237,5 +237,10 @@
             </snapshots>
             <url>file://${project.basedir}/lib</url>
         </repository>
+        <repository>
+            <id>edal-snapshots</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+       </repository>
     </repositories>
+
 </project>
