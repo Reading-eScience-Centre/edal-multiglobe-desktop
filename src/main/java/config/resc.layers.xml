@@ -37,5 +37,6 @@
     <Layer className="gov.nasa.worldwind.layers.Earth.NASAWFSPlaceNameLayer"/>
 <!--     <Layer className="gov.nasa.worldwind.layers.WorldMapLayer"/> -->
     <Layer className="gov.nasa.worldwind.layers.ScalebarLayer"/>
+    <Layer className="gov.nasa.worldwind.layers.Earth.CountryBoundariesLayer" actuate="onLoad"/>
 <!--     <Layer className="gov.nasa.worldwind.layers.CompassLayer"/> -->
 </LayerList>

@@ -28,39 +28,78 @@
 
 package uk.ac.rdg.resc;
 
-import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue;
+import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import gov.nasa.worldwind.BasicModel;
+import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
-import gov.nasa.worldwind.layers.Layer;
+import gov.nasa.worldwind.render.GlobeAnnotationBalloon;
+import gov.nasa.worldwind.render.GlobeBrowserBalloon;
 
 public class RescModel extends BasicModel {
     private Earth globe;
     private EarthFlat flatMap;
-    private FeatureCatalogue catalogue;
-
-    public RescModel(FeatureCatalogue catalogue) {
+    private VideoWallCatalogue catalogue;
+    private boolean flat = false;
+    
+    private EdalDataLayer edalDataLayer = null;
+    
+    private static int createdModels = 0;
+    private EdalConfigLayer edalConfigLayer;
+    
+    public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd) {
         super();
+
         this.catalogue = catalogue;
-        
+
         globe = new Earth();
         flatMap = new EarthFlat();
         setGlobe(globe);
+
+        /*
+         * TODO create 2 edal data layers and switch between them?  c.f. buffer flipping
+         */
+        edalDataLayer = new EdalDataLayer("edal-layer-"+(createdModels++), catalogue);
+        getLayers().add(edalDataLayer);
+        
+        edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
+        getLayers().add(edalConfigLayer);
     }
 
     public void setFlat(boolean flat) {
+        this.flat = flat;
         if (flat) {
             setGlobe(flatMap);
         } else {
             setGlobe(globe);
         }
     }
+
+    public boolean isFlat() {
+        return flat;
+    }
+
+    public EdalDataLayer getDataLayer() {
+        return edalDataLayer;
+    }
     
-    public void setDataLayer(String layerName, float min, float max) {
-        Layer layerByName = getLayers().getLayerByName("edal-layer");
-        if(layerByName != null) {
-            getLayers().remove(layerByName);
+    public void setDataLayer(String layerName) {
+        edalDataLayer.setData(layerName);
+    }
+
+    public void showFeatureInfo(Position position) {
+        if(edalDataLayer.isShowingData()) {
+            Number value = null;
+            try {
+                /*
+                 * null for DateTime because it's a hack (see comment in VideoWallCatalogue about this method being a hack...)
+                 */
+                value = catalogue.getLayerValue(edalDataLayer.getDataLayerName(), position, null, null);
+            } catch (EdalException e) {
+                e.printStackTrace();
+            }
+            GlobeAnnotationBalloon balloon = new GlobeAnnotationBalloon(edalDataLayer.getDataLayerName()+": "+value+"\nYou can't close this yet.  It's still in the proof-of-concept stage...", position);
+            edalConfigLayer.addRenderable(balloon);
         }
-        getLayers().add(new ProceduralTestLayer(layerName, catalogue, min, max));
     }
 }

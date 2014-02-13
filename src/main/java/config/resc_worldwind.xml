@@ -15,7 +15,9 @@
     <!--modify the file identified by the href or replace the link with your own-->
     <LayerList href="config/resc.layers.xml"/>
     <!--Most configuration information is defined in attribute-value pairs-->
-    <Property name="gov.nasa.worldwind.avkey.ModelClassName" value="gov.nasa.worldwind.BasicModel"/>
+<!--     <Property name="gov.nasa.worldwind.avkey.ModelClassName" value="uk.ac.rdg.resc.RescModel"/> -->
+    <Property name="gov.nasa.worldwind.avkey.GlobeClassName"
+              value="gov.nasa.worldwind.globes.Earth"/>
     <Property name="gov.nasa.worldwind.avkey.EarthElevationModelConfigFile"
               value="config/Earth/EarthElevations2.xml"/>
     <Property name="gov.nasa.worldwind.avkey.InitialLatitude" value="38"/>
@@ -40,7 +42,7 @@
     <Property name="gov.nasa.worldwind.avkey.RetrievalServiceClassName"
               value="gov.nasa.worldwind.retrieve.BasicRetrievalService"/>
     <Property name="gov.nasa.worldwind.avkey.SceneControllerClassName"
-              value="gov.nasa.worldwind.StereoOptionSceneController"/>
+              value="gov.nasa.worldwind.BasicSceneController"/>
     <Property name="gov.nasa.worldwind.avkey.NetworkStatusClassName"
               value="gov.nasa.worldwind.util.BasicNetworkStatus"/>
     <Property name="gov.nasa.worldwind.render.PointPlacemarkAttributes.DefaultImagePath"
