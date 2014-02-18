@@ -119,9 +119,9 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         Dataset dataset = getDatasetFromLayerName(layerId);
         String varId = getVariableFromId(layerId);
         Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
-                CollectionUtils.setOf(varId), new PlottingDomainParams(100, 100,
-                        new BoundingBoxImpl(position.longitude.degrees, position.latitude.degrees,
-                                position.longitude.degrees + 0.1, position.latitude.degrees + 0.1,
+                CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1,
+                        new BoundingBoxImpl(position.longitude.degrees-1e-8, position.latitude.degrees-1e-8,
+                                position.longitude.degrees+1e-8, position.latitude.degrees+1e-8,
                                 DefaultGeographicCRS.WGS84), null, null, null, null, null));
 
         DiscreteFeature<?, ?> feature = mapFeatures.iterator().next();

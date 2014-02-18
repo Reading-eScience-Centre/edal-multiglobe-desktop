@@ -28,6 +28,17 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.avlist.AVKey;
+import gov.nasa.worldwind.event.SelectEvent;
+import gov.nasa.worldwind.event.SelectListener;
+import gov.nasa.worldwind.geom.Vec4;
+import gov.nasa.worldwind.layers.RenderableLayer;
+import gov.nasa.worldwind.pick.PickedObject;
+import gov.nasa.worldwind.render.DrawContext;
+import gov.nasa.worldwind.render.ScreenAnnotation;
+import gov.nasa.worldwind.util.Logging;
+import gov.nasa.worldwindx.examples.util.ImageAnnotation;
+
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Cursor;
@@ -36,21 +47,6 @@ import java.awt.Font;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
-
-import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
-import gov.nasa.worldwind.WorldWindow;
-import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.event.SelectEvent;
-import gov.nasa.worldwind.event.SelectListener;
-import gov.nasa.worldwind.geom.Vec4;
-import gov.nasa.worldwind.layers.Layer;
-import gov.nasa.worldwind.layers.LayerList;
-import gov.nasa.worldwind.layers.RenderableLayer;
-import gov.nasa.worldwind.pick.PickedObject;
-import gov.nasa.worldwind.render.DrawContext;
-import gov.nasa.worldwind.render.ScreenAnnotation;
-import gov.nasa.worldwind.util.Logging;
-import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 /**
  * Currently just displays a cog and then a layer selector. Functional, but
@@ -67,6 +63,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
     private ImageAnnotation linkButton;
     private ImageAnnotation antilinkButton;
     private ImageAnnotation unlinkButton;
+    private ImageAnnotation flatButton;
 
     private ScreenAnnotation layerSelector;
     private String selectedId = "";
@@ -119,6 +116,11 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         unlinkButton.setScreenPoint(new Point(150, 0));
         unlinkButton.setPickEnabled(true);
         addRenderable(unlinkButton);
+        
+        flatButton = new ImageAnnotation("images/flat.png");
+        flatButton.setScreenPoint(new Point(200, 0));
+        flatButton.setPickEnabled(true);
+        addRenderable(flatButton);
 
         // Set up screen annotation that will display the layer list
         this.layerSelector = new ScreenAnnotation("", new Point(0, 0));
@@ -183,7 +185,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                         if (layerId.startsWith("expand:")) {
                             String idToExpand = layerId.substring(layerId.indexOf(":") + 1);
                             toggleExpand(idToExpand, catalogue.getEdalLayers());
-                        } else if (selectedId.equals(layerId)) {
+                        } else if (layerId.equals(selectedId)) {
                             selectedId = null;
                             wwd.getModel().setDataLayer(null);
                             displayConfigButton();
@@ -219,6 +221,10 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         } else if (event.hasObjects() && event.getTopObject() == unlinkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 wwd.setUnlinkedView();
+            }
+        } else if (event.hasObjects() && event.getTopObject() == flatButton) {
+            if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
+                wwd.toggleFlat();
             }
         } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)
                 && this.layerSelector.getAttributes().isHighlighted()) {
@@ -413,7 +419,6 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         if (parent == null) {
             return;
         }
-        Color color = (false) ? this.highlightColor : this.color;
         text.append("<font color=\"");
         text.append(encodeHTMLColor(new Color(0, true)));
         text.append("\">");
@@ -479,6 +484,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         this.linkButton.setScreenPoint(getButtonLocation(dc, 50));
         this.antilinkButton.setScreenPoint(getButtonLocation(dc, 100));
         this.unlinkButton.setScreenPoint(getButtonLocation(dc, 150));
+        this.flatButton.setScreenPoint(getButtonLocation(dc, 200));
         super.render(dc);
     }
 

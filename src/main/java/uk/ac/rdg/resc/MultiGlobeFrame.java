@@ -91,9 +91,9 @@ public class MultiGlobeFrame extends JPanel {
         return (RescModel) getPanel(row, column).getModel();
     }
 
-    public void setData(int row, int column, String field) {
-        getModel(row, column).setDataLayer(field);
-    }
+//    public void setData(int row, int column, String field) {
+//        getModel(row, column).setDataLayer(field);
+//    }
 
     public void setFlat(boolean flat, int row, int column) {
         getModel(row, column).setFlat(flat);

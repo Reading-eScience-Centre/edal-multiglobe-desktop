@@ -41,61 +41,74 @@ import gov.nasa.worldwind.geom.Position;
 
 @SuppressWarnings("serial")
 public class RescWorldWindow extends WorldWindowGLCanvas {
-    
+
     private final LinkedView linkedView;
-    
+    boolean showing = false;
+
     public RescWorldWindow(LinkedView linkedView) {
         super();
-        
+
         this.linkedView = linkedView;
         setView(this.linkedView);
-        
+
         addMouseListener(new MouseListener() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                Position currentPosition = getCurrentPosition();
-                if(currentPosition != null) {
-                    getModel().showFeatureInfo(currentPosition);
+                if (!e.isConsumed()) {
+                    System.out.println("RWW click event");
+                    Position currentPosition = getCurrentPosition();
+                    if (currentPosition != null && !showing) {
+                        getModel().showFeatureInfo(currentPosition);
+                        e.consume();
+                    }
                 }
             }
-            
+
             @Override
-            public void mouseReleased(MouseEvent e) {}
-            
+            public void mouseReleased(MouseEvent e) {
+            }
+
             @Override
-            public void mousePressed(MouseEvent e) {}
-            
+            public void mousePressed(MouseEvent e) {
+            }
+
             @Override
-            public void mouseExited(MouseEvent e) {}
-            
+            public void mouseExited(MouseEvent e) {
+            }
+
             @Override
-            public void mouseEntered(MouseEvent e) {}
+            public void mouseEntered(MouseEvent e) {
+            }
         });
     }
-    
+
     public LinkedView getLinkedView() {
         return linkedView;
     }
-    
+
     public void setLinkedView() {
         linkedView.setLinkState(LinkedViewState.LINKED);
     }
-    
+
     public void setUnlinkedView() {
         linkedView.setLinkState(LinkedViewState.UNLINKED);
     }
-    
+
     public void setAntilinkedView() {
         linkedView.setLinkState(LinkedViewState.ANTILINKED);
     }
-    
+
+    public void toggleFlat() {
+        getModel().setFlat(!getModel().isFlat());
+    }
+
     @Override
     public RescModel getModel() {
         return (RescModel) super.getModel();
     }
 
     public void setModel(RescModel model) {
-        if(!(model instanceof RescModel)) {
+        if (!(model instanceof RescModel)) {
             throw new IllegalArgumentException("Only RescModels can be used in RescWorldWindows");
         }
         super.setModel(model);

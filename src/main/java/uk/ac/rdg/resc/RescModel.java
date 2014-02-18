@@ -29,26 +29,34 @@
 package uk.ac.rdg.resc;
 
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
+import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import gov.nasa.worldwind.BasicModel;
 import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
+import gov.nasa.worldwind.layers.AnnotationLayer;
 import gov.nasa.worldwind.render.GlobeAnnotationBalloon;
 import gov.nasa.worldwind.render.GlobeBrowserBalloon;
+import gov.nasa.worldwindx.examples.util.DialogAnnotation;
 
 public class RescModel extends BasicModel {
     private Earth globe;
     private EarthFlat flatMap;
     private VideoWallCatalogue catalogue;
     private boolean flat = false;
-    
-    private EdalDataLayer edalDataLayer = null;
-    
-    private static int createdModels = 0;
+
+    private EdalDataLayer currentDataLayer = null;
+    private String edalLayerName = null;
+
     private EdalConfigLayer edalConfigLayer;
-    
+
+    private AnnotationLayer annotationLayer;
+    private RescWorldWindow wwd;
+
     public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd) {
         super();
+
+        this.wwd = wwd;
 
         this.catalogue = catalogue;
 
@@ -56,14 +64,11 @@ public class RescModel extends BasicModel {
         flatMap = new EarthFlat();
         setGlobe(globe);
 
-        /*
-         * TODO create 2 edal data layers and switch between them?  c.f. buffer flipping
-         */
-        edalDataLayer = new EdalDataLayer("edal-layer-"+(createdModels++), catalogue);
-        getLayers().add(edalDataLayer);
-        
         edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
         getLayers().add(edalConfigLayer);
+
+        annotationLayer = new AnnotationLayer();
+        getLayers().add(annotationLayer);
     }
 
     public void setFlat(boolean flat) {
@@ -79,27 +84,75 @@ public class RescModel extends BasicModel {
         return flat;
     }
 
-    public EdalDataLayer getDataLayer() {
-        return edalDataLayer;
-    }
-    
     public void setDataLayer(String layerName) {
-        edalDataLayer.setData(layerName);
+        edalLayerName = layerName;
+        /*
+         * TODO Add time, elevation, etc to method signature
+         */
+        if (currentDataLayer != null) {
+            getLayers().remove(currentDataLayer);
+        }
+        if (layerName == null) {
+            currentDataLayer = null;
+        } else {
+            /*
+             * TODO layerId needs to be (e.g.) a UUID which encapsulates date,
+             * time, elevation, layername, colourmap, etc. for caching
+             */
+            String layerId = layerName;
+            currentDataLayer = new EdalDataLayer(layerId, catalogue);
+            currentDataLayer.setData(layerName);
+            currentDataLayer.setPickEnabled(true);
+            getLayers().add(currentDataLayer);
+        }
     }
 
     public void showFeatureInfo(Position position) {
-        if(edalDataLayer.isShowingData()) {
-            Number value = null;
+        if (edalLayerName != null && !edalLayerName.equals("")) {
+            /*
+             * Only display feature info if we have an active layer
+             */
             try {
                 /*
-                 * null for DateTime because it's a hack (see comment in VideoWallCatalogue about this method being a hack...)
+                 * null for DateTime because it's a hack (see comment in
+                 * VideoWallCatalogue about this method being a hack...)
                  */
-                value = catalogue.getLayerValue(edalDataLayer.getDataLayerName(), position, null, null);
+                VariableMetadata metadata = catalogue.getVariableMetadataForLayer(edalLayerName);
+                if(metadata.getTemporalDomain() != null) {
+                    /*
+                     * Generate a timeseries graph
+                     */
+                }
+                if(metadata.getVerticalDomain() != null) {
+                    /*
+                     * Generate a profile graph
+                     */
+                }
+                /*-
+                 * Make the feature info balloon contain:
+                 * 
+                 * The layer name?
+                 * 
+                 * The value, nicely formatted and bold
+                 * 
+                 * A big close button (currently has a wee one)
+                 * 
+                 * A small square with the colour representing the value?
+                 * 
+                 * The timeseries/profile graphs (clickable -> big screen annotation)
+                 */
+                
+                Number value = catalogue.getLayerValue(edalLayerName, position, null, null);
+                FeatureInfoBalloon balloon = new FeatureInfoBalloon(
+//                        edalLayerName
+//                                + ": "
+//                                + value
+//                                + "\nYou can't close this yet.  It's still in the proof-of-concept stage...",
+                        position, wwd, annotationLayer);
+                annotationLayer.addAnnotation(balloon);
             } catch (EdalException e) {
                 e.printStackTrace();
             }
-            GlobeAnnotationBalloon balloon = new GlobeAnnotationBalloon(edalDataLayer.getDataLayerName()+": "+value+"\nYou can't close this yet.  It's still in the proof-of-concept stage...", position);
-            edalConfigLayer.addRenderable(balloon);
         }
     }
 }

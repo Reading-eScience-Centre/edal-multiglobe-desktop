@@ -45,30 +45,46 @@ import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
 
 /**
- * Procedural layer example
+ * This is a layer which displays EDAL data and can change data.
  * 
- * @author Patrick Murris
- * @version $Id:$
+ * Not used at the moment. See {@link EdalDataLayer} for a layer which can't
+ * change data - instead you change the layer
  */
-public class EdalDataLayer extends BasicTiledImageLayer implements SelectListener {
+public class SingleEdalDataLayer extends BasicTiledImageLayer implements SelectListener {
     private VideoWallCatalogue catalogue;
     private MapImage mapImage = null;
+
+    private String currentLayerName = null;
 
     private DateTime time = new DateTime(2010, 07, 15, 12, 00, ISOChronology.getInstanceUTC());
     private Double elevation = 5.0;
 
-    public EdalDataLayer(String layerId, VideoWallCatalogue catalogue) {
+    public SingleEdalDataLayer(String layerId, VideoWallCatalogue catalogue) {
         super(makeLevels(layerId));
+        /*
+         * Make this layer's cache expire immediately. This will clear out data
+         * from any previous runs (since the IDs don't change between runs)
+         */
+        setExpiryTime(System.currentTimeMillis());
         this.catalogue = catalogue;
         setName(layerId);
-        setUseTransparentTextures(true);
+        this.setUseTransparentTextures(true);
         setPickEnabled(true);
+        setEnabled(false);
+    }
+
+    public String getDataLayerName() {
+        return currentLayerName;
+    }
+
+    public boolean isShowingData() {
+        return !(currentLayerName == null || currentLayerName.equals(""));
     }
 
     public synchronized void setData(String layerName) {
         if (layerName == null) {
             /*
-             * Setting this layer to display no data. This shouldn't get called.
+             * Setting this layer to display no data
              */
             setEnabled(false);
             mapImage = null;
@@ -84,6 +100,11 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
              * TODO log this properly
              */
             return;
+        }
+        if (layerName.equals(currentLayerName)) {
+            return;
+        } else {
+            currentLayerName = layerName;
         }
 
         try {
@@ -117,11 +138,27 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
         RasterLayer rasterLayer = new RasterLayer(layerName, colourScheme);
         mapImage = new MapImage();
         mapImage.getLayers().add(rasterLayer);
+
+        /*
+         * Expire the old images
+         */
+        setExpiryTime(System.currentTimeMillis() - 1000L);
+        String location = WorldWind.getDataFileStore().getWriteLocation().getAbsolutePath();
+        System.out.println("Expiring data at: " + location);
+        //        File cache = new File(location);
+        //        boolean delete = cache.delete();
+        //        System.out.println("deleted cache: "+delete);
+        firePropertyChange(AVKey.LAYER, null, this);
+        setEnabled(true);
     }
 
     @Override
     protected synchronized void retrieveRemoteTexture(TextureTile tile,
             DownloadPostProcessor postProcessor) {
+        //        String pathname = tile.getPath();
+        //        if(pathname.contains("edal-layer-0")) {
+        //            System.out.println("Generating image of "+currentLayerName+": "+tile.getPath());
+        //        }
         final File outFile = WorldWind.getDataFileStore().newFile(tile.getPath());
         if (outFile == null) {
             return;
