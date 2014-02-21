@@ -48,8 +48,9 @@ import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
-import uk.ac.rdg.resc.edal.feature.GridFeature;
 import uk.ac.rdg.resc.edal.feature.MapFeature;
+import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
+import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
 import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
@@ -58,7 +59,7 @@ import uk.ac.rdg.resc.edal.ncwms.config.NcwmsConfig.DatasetStorage;
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
 import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.util.CollectionUtils;
-import uk.ac.rdg.resc.edal.util.GridCoordinates2D;
+import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
 import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
@@ -119,24 +120,51 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         Dataset dataset = getDatasetFromLayerName(layerId);
         String varId = getVariableFromId(layerId);
         Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
-                CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1,
-                        new BoundingBoxImpl(position.longitude.degrees-1e-8, position.latitude.degrees-1e-8,
-                                position.longitude.degrees+1e-8, position.latitude.degrees+1e-8,
-                                DefaultGeographicCRS.WGS84), null, null, null, null, null));
+                CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1, new BoundingBoxImpl(
+                        position.longitude.degrees - 1e-8, position.latitude.degrees - 1e-8,
+                        position.longitude.degrees + 1e-8, position.latitude.degrees + 1e-8,
+                        DefaultGeographicCRS.WGS84), null, null, null, null, null));
 
         DiscreteFeature<?, ?> feature = mapFeatures.iterator().next();
         if (feature instanceof MapFeature) {
             MapFeature mapFeature = (MapFeature) feature;
             /*
-             * This should correspond to the ll corner of the bbox, so that's right
+             * This should correspond to the ll corner of the bbox, so that's
+             * right
              * 
-             * But yeah, massive hack 
+             * But yeah, massive hack
              */
-            return mapFeature.getValues(varId).get(0,0);
-            
+            return mapFeature.getValues(varId).get(0, 0);
+
         } else {
             return null;
         }
+    }
+
+    public Collection<? extends ProfileFeature> getProfiles(String layerId, Position position)
+            throws EdalException {
+        Dataset dataset = getDatasetFromLayerName(layerId);
+        String varId = getVariableFromId(layerId);
+        VariableMetadata variableMetadata = dataset.getVariableMetadata(varId);
+        DateTime latest = variableMetadata.getTemporalDomain().getExtent().getHigh();
+        Collection<? extends ProfileFeature> profileFeatures = dataset
+                .extractProfileFeatures(CollectionUtils.setOf(varId), new PlottingDomainParams(1,
+                        1, null, null, null, new HorizontalPosition(position.longitude.degrees,
+                                position.latitude.degrees, DefaultGeographicCRS.WGS84), null, latest));
+        return profileFeatures;
+    }
+    
+    public Collection<? extends PointSeriesFeature> getTimeseries(String layerId, Position position)
+            throws EdalException {
+        Dataset dataset = getDatasetFromLayerName(layerId);
+        String varId = getVariableFromId(layerId);
+        VariableMetadata variableMetadata = dataset.getVariableMetadata(varId);
+        Double surface = GISUtils.getClosestElevationToSurface(variableMetadata.getVerticalDomain());
+        Collection<? extends PointSeriesFeature> timeseriesFeatures = dataset
+                .extractTimeseriesFeatures(CollectionUtils.setOf(varId), new PlottingDomainParams(1,
+                        1, null, null, null, new HorizontalPosition(position.longitude.degrees,
+                                position.latitude.degrees, DefaultGeographicCRS.WGS84), surface, null));
+        return timeseriesFeatures;
     }
 
     /**

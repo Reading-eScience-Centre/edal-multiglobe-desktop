@@ -28,22 +28,18 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
+import gov.nasa.worldwind.geom.Position;
+
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 
 import uk.ac.rdg.resc.LinkedView.LinkedViewState;
-import gov.nasa.worldwind.Model;
-import gov.nasa.worldwind.View;
-import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
-import gov.nasa.worldwind.event.SelectEvent;
-import gov.nasa.worldwind.event.SelectListener;
-import gov.nasa.worldwind.geom.Position;
 
 @SuppressWarnings("serial")
 public class RescWorldWindow extends WorldWindowGLCanvas {
 
     private final LinkedView linkedView;
-    boolean showing = false;
 
     public RescWorldWindow(LinkedView linkedView) {
         super();
@@ -55,9 +51,8 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (!e.isConsumed()) {
-                    System.out.println("RWW click event");
                     Position currentPosition = getCurrentPosition();
-                    if (currentPosition != null && !showing) {
+                    if (currentPosition != null) {
                         getModel().showFeatureInfo(currentPosition);
                         e.consume();
                     }
