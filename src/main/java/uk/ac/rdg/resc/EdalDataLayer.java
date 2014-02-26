@@ -54,12 +54,14 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
     private VideoWallCatalogue catalogue;
     private MapImage mapImage = null;
 
-    private DateTime time = new DateTime(2010, 07, 15, 12, 00, ISOChronology.getInstanceUTC());
-    private Double elevation = 5.0;
+    private DateTime time;// = new DateTime(2010, 07, 15, 12, 00, ISOChronology.getInstanceUTC());
+    private Double elevation;// = 5.0;
 
-    public EdalDataLayer(String layerId, VideoWallCatalogue catalogue) {
+    public EdalDataLayer(String layerId, VideoWallCatalogue catalogue, Double elevation, DateTime time) {
         super(makeLevels(layerId));
         this.catalogue = catalogue;
+        this.elevation = elevation;
+        this.time = time;
         setName(layerId);
         setUseTransparentTextures(true);
         setPickEnabled(true);

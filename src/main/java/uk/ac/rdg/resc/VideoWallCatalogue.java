@@ -76,7 +76,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         config = NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml"));
         config.setDatasetLoadedHandler(this);
         config.loadDatasets();
-
+        
         datasets = new HashMap<>();
         variables = new HashMap<>();
 

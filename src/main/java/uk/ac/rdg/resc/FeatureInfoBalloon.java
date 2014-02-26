@@ -150,6 +150,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                 profileGraph.setPickEnabled(true);
                 AnnotationAttributes attributes = profileGraph.getAttributes();
                 attributes.setImageScale(PREVIEW_SCALE);
+                attributes.setDistanceMinOpacity(0.0);
             }
         }
         if (timeseriesPath != null) {

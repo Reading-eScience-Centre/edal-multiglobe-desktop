@@ -30,12 +30,18 @@ package uk.ac.rdg.resc;
 
 import gov.nasa.worldwind.BasicModel;
 import gov.nasa.worldwind.WorldWind;
+import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
 import gov.nasa.worldwind.layers.AnnotationLayer;
+import gov.nasa.worldwind.layers.ViewControlsLayer;
+import gov.nasa.worldwind.layers.ViewControlsSelectListener;
+import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Point;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -43,27 +49,45 @@ import java.util.Collection;
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.jfree.chart.ChartUtilities;
 import org.jfree.chart.JFreeChart;
+import org.joda.time.DateTime;
 
+import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
+import uk.ac.rdg.resc.edal.domain.TemporalDomain;
+import uk.ac.rdg.resc.edal.domain.VerticalDomain;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.graphics.Charting;
+import uk.ac.rdg.resc.edal.grid.TimeAxis;
+import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.position.HorizontalPosition;
+import uk.ac.rdg.resc.edal.position.VerticalCrs;
+import uk.ac.rdg.resc.edal.util.GISUtils;
 
-public class RescModel extends BasicModel {
+public class RescModel extends BasicModel implements SliderWidgetHandler {
+    private final static String DEPTH_SLIDER = "depth-slider";
+    private final static String TIME_SLIDER = "time-slider";
+
     private Earth globe;
     private EarthFlat flatMap;
     private VideoWallCatalogue catalogue;
     private boolean flat = false;
 
     private EdalDataLayer currentDataLayer = null;
+    private VariableMetadata currentMetadata = null;
     private String edalLayerName = null;
 
     private EdalConfigLayer edalConfigLayer;
 
+    private SliderWidgetAnnotation depthSlider;
+    private SliderWidgetAnnotation timeSlider;
+
     private AnnotationLayer annotationLayer;
     private RescWorldWindow wwd;
+
+    private Double elevation;
+    private DateTime time;
 
     public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd) {
         super();
@@ -81,6 +105,20 @@ public class RescModel extends BasicModel {
 
         annotationLayer = new AnnotationLayer();
         getLayers().add(annotationLayer);
+
+        depthSlider = new SliderWidgetAnnotation(DEPTH_SLIDER, AVKey.VERTICAL, AVKey.WEST, 100, 0,
+                wwd, this);
+        annotationLayer.addAnnotation(depthSlider);
+
+        timeSlider = new SliderWidgetAnnotation(TIME_SLIDER, AVKey.HORIZONTAL, AVKey.SOUTH, 0,
+                1000, wwd, this);
+        annotationLayer.addAnnotation(timeSlider);
+
+        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
+        viewControlsLayer.setShowPitchControls(false);
+        viewControlsLayer.setShowVeControls(false);
+        getLayers().add(viewControlsLayer);
+        wwd.addSelectListener(new ViewControlsSelectListener(wwd, viewControlsLayer));
     }
 
     public void setFlat(boolean flat) {
@@ -97,23 +135,109 @@ public class RescModel extends BasicModel {
     }
 
     public void setDataLayer(String layerName) {
+        if (layerName != null && !layerName.equals(edalLayerName)) {
+            /*
+             * We have changed the layer. We want to pick a default datetime and
+             * depth.
+             */
+            try {
+                currentMetadata = catalogue.getVariableMetadataForLayer(layerName);
+            } catch (EdalException e) {
+                /*
+                 * The specified layer isn't found. Don't set it
+                 * 
+                 * TODO log this
+                 */
+                return;
+            }
+            VerticalDomain verticalDomain = currentMetadata.getVerticalDomain();
+            if (verticalDomain != null) {
+                VerticalCrs verticalCrs = verticalDomain.getVerticalCrs();
+                if(verticalCrs != null) {
+                    if(verticalCrs.isPositiveUpwards()) {
+                    }
+                }
+                depthSlider.setLimits(verticalDomain.getExtent().getLow(), verticalDomain.getExtent().getHigh());
+                setDepth(GISUtils.getClosestElevationToSurface(verticalDomain));
+                this.depthSlider.setSliderValue(this.elevation);
+                /*
+                 * TODO check if this is depth or elevation and set the limits accordingly.
+                 */
+            } else {
+                /*
+                 * TODO hide slider
+                 */
+            }
+            TemporalDomain timeDomain = currentMetadata.getTemporalDomain();
+            if (timeDomain != null) {
+                timeSlider.setLimits(timeDomain.getExtent().getLow().getMillis(), timeDomain.getExtent().getHigh().getMillis());
+                if(timeDomain instanceof TimeAxis) {
+                    setTime(GISUtils.getClosestToCurrentTime(((TimeAxis)timeDomain).getCoordinateValues()));
+                }
+                this.timeSlider.setSliderValue(this.time.getMillis());
+            } else {
+                /*
+                 * TODO hide slider
+                 */
+            }
+        }
         edalLayerName = layerName;
+        drawLayer();
         /*
          * TODO Add time, elevation, etc to method signature
          */
+    }
+
+    private void setTime(DateTime time) {
+        if(currentMetadata == null) {
+            /*
+             * TODO make sure that sliders are only drawn when there is a time/depth axis
+             */
+            return;
+        }
+        TemporalDomain temporalDomain = currentMetadata.getTemporalDomain();
+        if(temporalDomain instanceof TimeAxis) {
+            TimeAxis timeAxis = (TimeAxis) temporalDomain;
+            this.time = GISUtils.getClosestTimeTo(time, timeAxis.getCoordinateValues());
+        } else {
+            this.time = time;
+        }
+    }
+
+    private void setDepth(double depth) {
+        if(currentMetadata == null) {
+            return;
+        }
+        VerticalDomain zDomain = currentMetadata.getVerticalDomain();
+        if(zDomain instanceof VerticalAxis) {
+            VerticalAxis verticalAxis = (VerticalAxis) zDomain;
+            int zIndex = verticalAxis.findIndexOf(depth);
+            this.elevation = verticalAxis.getCoordinateValue(zIndex);
+        } else {
+            this.elevation = depth;
+        }
+    }
+
+    private String getLayerUUID() {
+        /*
+         * TODO make it a UUID and include other things
+         */
+        return edalLayerName + "," + time + "," + elevation;
+    }
+
+    private void drawLayer() {
         if (currentDataLayer != null) {
             getLayers().remove(currentDataLayer);
         }
-        if (layerName == null) {
+        if (edalLayerName == null) {
             currentDataLayer = null;
         } else {
             /*
              * TODO layerId needs to be (e.g.) a UUID which encapsulates date,
              * time, elevation, layername, colourmap, etc. for caching
              */
-            String layerId = layerName;
-            currentDataLayer = new EdalDataLayer(layerId, catalogue);
-            currentDataLayer.setData(layerName);
+            currentDataLayer = new EdalDataLayer(getLayerUUID(), catalogue, elevation, time);
+            currentDataLayer.setData(edalLayerName);
             currentDataLayer.setPickEnabled(true);
             getLayers().add(currentDataLayer);
         }
@@ -272,6 +396,22 @@ public class RescModel extends BasicModel {
                 }
             }).start();
             ;
+        }
+    }
+
+    @Override
+    public void sliderChanged(String id, double value) {
+        switch (id) {
+        case DEPTH_SLIDER:
+            setDepth(value);
+            drawLayer();
+            break;
+        case TIME_SLIDER:
+            setTime(new DateTime((long) value));
+            drawLayer();
+            break;
+        default:
+            break;
         }
     }
 }

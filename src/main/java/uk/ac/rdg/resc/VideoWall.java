@@ -30,6 +30,7 @@ package uk.ac.rdg.resc;
 
 import gov.nasa.worldwind.BasicFactory;
 import gov.nasa.worldwind.Configuration;
+import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.layers.Layer;
 import gov.nasa.worldwind.layers.LayerList;
@@ -64,17 +65,6 @@ public class VideoWall extends JFrame {
     
     public static void main(String[] args) {
         System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
-//        Element element = Configuration.getElement("./LayerList");
-//        Object o = BasicFactory.create(AVKey.LAYER_FACTORY, element);
-//        LayerList[] lists = (LayerList[]) o;
-//        LayerList ll = null;
-//        if (lists.length > 0)
-//             ll = LayerList.collapseLists((LayerList[]) o);
-//        for(Layer l : ll) {
-//            System.out.println(l.getName()+","+l.getClass());
-//        }
-//        System.out.println(o.getClass());
-//        System.out.println(element.getTagName());
         java.awt.EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
