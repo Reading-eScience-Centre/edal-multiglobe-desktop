@@ -35,16 +35,13 @@ import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
 import gov.nasa.worldwind.layers.AnnotationLayer;
-import gov.nasa.worldwind.layers.ViewControlsLayer;
-import gov.nasa.worldwind.layers.ViewControlsSelectListener;
-import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Point;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.jfree.chart.ChartUtilities;
@@ -66,8 +63,10 @@ import uk.ac.rdg.resc.edal.position.VerticalCrs;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 
 public class RescModel extends BasicModel implements SliderWidgetHandler {
-    private final static String DEPTH_SLIDER = "depth-slider";
+    private final static String ELEVATION_SLIDER = "depth-slider";
     private final static String TIME_SLIDER = "time-slider";
+
+    private MultiGlobeFrame parent;
 
     private Earth globe;
     private EarthFlat flatMap;
@@ -80,7 +79,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
     private EdalConfigLayer edalConfigLayer;
 
-    private SliderWidgetAnnotation depthSlider;
+    private SliderWidgetAnnotation elevationSlider;
     private SliderWidgetAnnotation timeSlider;
 
     private AnnotationLayer annotationLayer;
@@ -89,12 +88,15 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     private Double elevation;
     private DateTime time;
 
-    public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd) {
+    private List<RescModel> elevationLinkedModels = new ArrayList<>();
+    private List<RescModel> timeLinkedModels = new ArrayList<>();
+
+    public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd, MultiGlobeFrame parent) {
         super();
 
-        this.wwd = wwd;
-
         this.catalogue = catalogue;
+        this.wwd = wwd;
+        this.parent = parent;
 
         globe = new Earth();
         flatMap = new EarthFlat();
@@ -106,19 +108,16 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         annotationLayer = new AnnotationLayer();
         getLayers().add(annotationLayer);
 
-        depthSlider = new SliderWidgetAnnotation(DEPTH_SLIDER, AVKey.VERTICAL, AVKey.WEST, 100, 0,
-                wwd, this);
-        annotationLayer.addAnnotation(depthSlider);
-
+        elevationSlider = new SliderWidgetAnnotation(ELEVATION_SLIDER, AVKey.VERTICAL, AVKey.WEST,
+                100, 0, wwd, this);
         timeSlider = new SliderWidgetAnnotation(TIME_SLIDER, AVKey.HORIZONTAL, AVKey.SOUTH, 0,
                 1000, wwd, this);
-        annotationLayer.addAnnotation(timeSlider);
 
-        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
-        viewControlsLayer.setShowPitchControls(false);
-        viewControlsLayer.setShowVeControls(false);
-        getLayers().add(viewControlsLayer);
-        wwd.addSelectListener(new ViewControlsSelectListener(wwd, viewControlsLayer));
+        //        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
+        //        viewControlsLayer.setShowPitchControls(false);
+        //        viewControlsLayer.setShowVeControls(false);
+        //        getLayers().add(viewControlsLayer);
+        //        wwd.addSelectListener(new ViewControlsSelectListener(wwd, viewControlsLayer));
     }
 
     public void setFlat(boolean flat) {
@@ -135,10 +134,14 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     public void setDataLayer(String layerName) {
+        boolean newLayer = false;
         if (layerName != null && !layerName.equals(edalLayerName)) {
+            //            EdalDataLayer.precacheLayer(layerName, catalogue);
+            newLayer = true;
+
             /*
              * We have changed the layer. We want to pick a default datetime and
-             * depth.
+             * depth, and precache all available times/elevations
              */
             try {
                 currentMetadata = catalogue.getVariableMetadataForLayer(layerName);
@@ -150,79 +153,125 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                  */
                 return;
             }
+
+            /*
+             * Remove the elevation/time sliders. We will add them again if
+             * required.
+             */
+            annotationLayer.removeAnnotation(elevationSlider);
+            annotationLayer.removeAnnotation(timeSlider);
+
             VerticalDomain verticalDomain = currentMetadata.getVerticalDomain();
             if (verticalDomain != null) {
                 VerticalCrs verticalCrs = verticalDomain.getVerticalCrs();
-                if(verticalCrs != null) {
-                    if(verticalCrs.isPositiveUpwards()) {
+                if (verticalCrs != null) {
+                    if (verticalCrs.isPositiveUpwards()) {
+                        /*
+                         * TODO check if this is depth or elevation and set the
+                         * limits accordingly.
+                         */
+                        elevationSlider.setReversed(false);
+                    } else {
+                        elevationSlider.setReversed(true);
                     }
                 }
-                depthSlider.setLimits(verticalDomain.getExtent().getLow(), verticalDomain.getExtent().getHigh());
-                setDepth(GISUtils.getClosestElevationToSurface(verticalDomain));
-                this.depthSlider.setSliderValue(this.elevation);
                 /*
-                 * TODO check if this is depth or elevation and set the limits accordingly.
+                 * Set the elevation, slider limits and slider value
                  */
-            } else {
+                setElevation(GISUtils.getClosestElevationToSurface(verticalDomain));
+                elevationSlider.setLimits(verticalDomain.getExtent().getLow(), verticalDomain
+                        .getExtent().getHigh());
+                elevationSlider.setSliderValue(elevation);
+
+                List<RescModel> allModels = parent.getAllModels();
+                elevationLinkedModels.clear();
+                for (RescModel model : allModels) {
+                    if (model.elevationSlider.equalLimits(elevationSlider)) {
+                        elevationLinkedModels.add(model);
+                        if (!model.elevationLinkedModels.contains(this)) {
+                            model.elevationLinkedModels.add(this);
+                        }
+                        if (model != this) {
+                            elevationSlider.setSliderValue(model.elevationSlider.getSliderValue());
+                            setElevation(model.elevationSlider.getSliderValue());
+                        }
+                    }
+                }
+
                 /*
-                 * TODO hide slider
+                 * Add the elevation slider
                  */
+                annotationLayer.addAnnotation(elevationSlider);
             }
+
             TemporalDomain timeDomain = currentMetadata.getTemporalDomain();
             if (timeDomain != null) {
-                timeSlider.setLimits(timeDomain.getExtent().getLow().getMillis(), timeDomain.getExtent().getHigh().getMillis());
-                if(timeDomain instanceof TimeAxis) {
-                    setTime(GISUtils.getClosestToCurrentTime(((TimeAxis)timeDomain).getCoordinateValues()));
+                setTime(GISUtils.getClosestToCurrentTime(timeDomain));
+                timeSlider.setLimits(timeDomain.getExtent().getLow().getMillis(), timeDomain
+                        .getExtent().getHigh().getMillis());
+                timeSlider.setSliderValue(time.getMillis());
+
+                List<RescModel> allModels = parent.getAllModels();
+                timeLinkedModels.clear();
+                for (RescModel model : allModels) {
+                    if (model.timeSlider.equalLimits(timeSlider)) {
+                        timeLinkedModels.add(model);
+                        if (!model.timeLinkedModels.contains(this)) {
+                            model.timeLinkedModels.add(this);
+                        }
+                    }
+                    if (model != this) {
+                        timeSlider.setSliderValue(model.timeSlider.getSliderValue());
+                        setTime(new DateTime((long) model.timeSlider.getSliderValue()));
+                    }
                 }
-                this.timeSlider.setSliderValue(this.time.getMillis());
-            } else {
                 /*
-                 * TODO hide slider
+                 * Add the time slider
                  */
+                annotationLayer.addAnnotation(timeSlider);
             }
+
         }
         edalLayerName = layerName;
         drawLayer();
+
+        if (newLayer) {
+            //            EdalDataLayer.precacheLayer(layerName, catalogue);
+        }
         /*
          * TODO Add time, elevation, etc to method signature
          */
     }
 
     private void setTime(DateTime time) {
-        if(currentMetadata == null) {
+        if (currentMetadata == null) {
             /*
-             * TODO make sure that sliders are only drawn when there is a time/depth axis
+             * TODO make sure that sliders are only drawn when there is a
+             * time/depth axis
              */
             return;
         }
         TemporalDomain temporalDomain = currentMetadata.getTemporalDomain();
-        if(temporalDomain instanceof TimeAxis) {
+        if (temporalDomain instanceof TimeAxis) {
             TimeAxis timeAxis = (TimeAxis) temporalDomain;
-            this.time = GISUtils.getClosestTimeTo(time, timeAxis.getCoordinateValues());
+            this.time = GISUtils.getClosestTimeTo(time, timeAxis);
         } else {
             this.time = time;
         }
     }
 
-    private void setDepth(double depth) {
-        if(currentMetadata == null) {
+    private void setElevation(double depth) {
+        if (currentMetadata == null) {
             return;
         }
         VerticalDomain zDomain = currentMetadata.getVerticalDomain();
-        if(zDomain instanceof VerticalAxis) {
+        if (zDomain instanceof VerticalAxis) {
             VerticalAxis verticalAxis = (VerticalAxis) zDomain;
             int zIndex = verticalAxis.findIndexOf(depth);
             this.elevation = verticalAxis.getCoordinateValue(zIndex);
         } else {
             this.elevation = depth;
         }
-    }
-
-    private String getLayerUUID() {
-        /*
-         * TODO make it a UUID and include other things
-         */
-        return edalLayerName + "," + time + "," + elevation;
     }
 
     private void drawLayer() {
@@ -236,9 +285,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              * TODO layerId needs to be (e.g.) a UUID which encapsulates date,
              * time, elevation, layername, colourmap, etc. for caching
              */
-            currentDataLayer = new EdalDataLayer(getLayerUUID(), catalogue, elevation, time);
-            currentDataLayer.setData(edalLayerName);
-            currentDataLayer.setPickEnabled(true);
+            currentDataLayer = new EdalDataLayer(edalLayerName, catalogue, elevation, time);
             getLayers().add(currentDataLayer);
         }
     }
@@ -248,170 +295,218 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
          * Only display feature info if we have an active layer
          */
         if (edalLayerName != null && !edalLayerName.equals("")) {
-            final FeatureInfoBalloon balloon = new FeatureInfoBalloon(position, wwd,
-                    annotationLayer);
-            annotationLayer.addAnnotation(balloon);
-
-            /*
-             * Now extract the value and graphs in their own thread so that the
-             * balloon appears instantly
-             */
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    VariableMetadata metadata;
-                    try {
-                        metadata = catalogue.getVariableMetadataForLayer(edalLayerName);
-                    } catch (EdalException e) {
-                        /*
-                         * Can't find metadata for this layer. No point in
-                         * continuing
-                         */
-                        balloon.setValueText("No data layer selected");
-                        e.printStackTrace();
-                        return;
-                    }
-                    /*
-                     * First read the data value and display the feature info
-                     * balloon
-                     */
-                    Number value = null;
-                    try {
-                        value = catalogue.getLayerValue(edalLayerName, position, null, null);
-                    } catch (EdalException e) {
-                        /*
-                         * There is a problem reading the data. We log the error
-                         * and continue. The feature info balloon will give a
-                         * no-data message.
-                         */
-                        /*
-                         * TODO log error in WW way
-                         */
-                        e.printStackTrace();
-                    }
-                    String valueText;
-                    if (value == null || Double.isNaN(value.doubleValue())) {
-                        valueText = "No data value here";
-                    } else {
-                        valueText = "Value of layer " + metadata.getId() + " is " + value
-                                + metadata.getParameter().getUnits();
-                    }
-
-                    balloon.setValueText(valueText);
-
-                    /*
-                     * null for DateTime because it's a hack (see comment in
-                     * VideoWallCatalogue about this method being a hack...)
-                     */
-                    try {
-                        int width = wwd.getWidth() - 52;
-                        int height = wwd.getHeight() - 52;
-                        String profileLocation = null;
-                        String timeseriesLocation = null;
-                        if (metadata.getTemporalDomain() != null) {
-                            /*
-                             * Generate a timeseries graph
-                             */
-                            Collection<? extends PointSeriesFeature> timeseries = catalogue
-                                    .getTimeseries(edalLayerName, position);
-
-                            if (timeseries != null && timeseries.size() > 0) {
-                                JFreeChart timeseriesChart = Charting.createTimeSeriesPlot(
-                                        timeseries, new HorizontalPosition(
-                                                position.longitude.degrees,
-                                                position.latitude.degrees,
-                                                DefaultGeographicCRS.WGS84));
-                                timeseriesChart.setBackgroundPaint(Color.white);
-
-                                /*
-                                 * Save the chart at the same size as the panel
-                                 */
-                                /*
-                                 * Change to a UUID once it works
-                                 */
-                                timeseriesLocation = "EDAL/Charts/TS-" + System.currentTimeMillis();
-                                File timeseriesFile = WorldWind.getDataFileStore().newFile(
-                                        timeseriesLocation);
-                                ChartUtilities.saveChartAsPNG(timeseriesFile, timeseriesChart,
-                                        width, height);
-                                /*
-                                 * Now save a fixed-ratio preview chart
-                                 */
-                                File timeseriesPreviewFile = WorldWind.getDataFileStore().newFile(
-                                        timeseriesLocation + "-preview");
-                                ChartUtilities
-                                        .saveChartAsPNG(
-                                                timeseriesPreviewFile,
-                                                timeseriesChart,
-                                                (int) (FeatureInfoBalloon.TARGET_WIDTH / FeatureInfoBalloon.PREVIEW_SCALE),
-                                                (int) (FeatureInfoBalloon.TARGET_HEIGHT / FeatureInfoBalloon.PREVIEW_SCALE));
-                            }
-                        }
-                        if (metadata.getVerticalDomain() != null) {
-                            /*
-                             * Generate a profile graph
-                             */
-                            Collection<? extends ProfileFeature> profiles = catalogue.getProfiles(
-                                    edalLayerName, position);
-                            if (profiles != null && profiles.size() > 0) {
-                                JFreeChart profileChart = Charting.createVerticalProfilePlot(
-                                        profiles, new HorizontalPosition(
-                                                position.longitude.degrees,
-                                                position.latitude.degrees,
-                                                DefaultGeographicCRS.WGS84));
-                                profileChart.setBackgroundPaint(Color.white);
-                                /*
-                                 * Change to a UUID once it works
-                                 */
-                                profileLocation = "EDAL/Charts/PF-" + System.currentTimeMillis();
-                                File profileFile = WorldWind.getDataFileStore().newFile(
-                                        profileLocation);
-                                ChartUtilities.saveChartAsPNG(profileFile, profileChart, width,
-                                        height);
-                                /*
-                                 * Now save a fixed-ratio preview chart
-                                 */
-                                File profilePreviewFile = WorldWind.getDataFileStore().newFile(
-                                        profileLocation + "-preview");
-                                ChartUtilities
-                                        .saveChartAsPNG(
-                                                profilePreviewFile,
-                                                profileChart,
-                                                (int) (FeatureInfoBalloon.TARGET_WIDTH / FeatureInfoBalloon.PREVIEW_SCALE),
-                                                (int) (FeatureInfoBalloon.TARGET_HEIGHT / FeatureInfoBalloon.PREVIEW_SCALE));
-                            }
-                        }
-                        balloon.setGraphs(profileLocation, timeseriesLocation);
-                    } catch (EdalException e) {
-                        /*
-                         * Another problem generating graphs
-                         */
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        /*
-                         * Problem writing chart to data file store
-                         */
-                        e.printStackTrace();
-                    }
+            for (RescModel model : timeLinkedModels) {
+                if (model.wwd.getLinkedView().getLinkedViewState()
+                        .equals(wwd.getLinkedView().getLinkedViewState())) {
+                    model.doShowFeatureInfo(position);
                 }
-            }).start();
-            ;
+            }
         }
     }
 
+    private void doShowFeatureInfo(final Position position) {
+        final FeatureInfoBalloon balloon = new FeatureInfoBalloon(position, wwd, annotationLayer);
+        annotationLayer.addAnnotation(balloon);
+
+        /*
+         * Now extract the value and graphs in their own thread so that the
+         * balloon appears instantly
+         */
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                VariableMetadata metadata;
+                try {
+                    metadata = catalogue.getVariableMetadataForLayer(edalLayerName);
+                } catch (EdalException e) {
+                    /*
+                     * Can't find metadata for this layer. No point in
+                     * continuing
+                     */
+                    balloon.setValueText("No data layer selected");
+                    e.printStackTrace();
+                    return;
+                }
+                /*
+                 * First read the data value and display the feature info
+                 * balloon
+                 */
+                Number value = null;
+                try {
+                    value = catalogue.getLayerValue(edalLayerName, position, null, null);
+                } catch (EdalException e) {
+                    /*
+                     * There is a problem reading the data. We log the error and
+                     * continue. The feature info balloon will give a no-data
+                     * message.
+                     */
+                    /*
+                     * TODO log error in WW way
+                     */
+                    e.printStackTrace();
+                }
+                String valueText;
+                if (value == null || Double.isNaN(value.doubleValue())) {
+                    valueText = "No data value here";
+                } else {
+                    valueText = "Value of layer " + metadata.getId() + " is " + value
+                            + metadata.getParameter().getUnits();
+                }
+
+                balloon.setValueText(valueText);
+
+                try {
+                    int width = wwd.getWidth() - 52;
+                    int height = wwd.getHeight() - 52;
+                    String profileLocation = null;
+                    String timeseriesLocation = null;
+                    if (metadata.getTemporalDomain() != null) {
+                        /*
+                         * Generate a timeseries graph
+                         */
+                        Collection<? extends PointSeriesFeature> timeseries = catalogue
+                                .getTimeseries(edalLayerName, position);
+
+                        if (timeseries != null && timeseries.size() > 0) {
+                            JFreeChart timeseriesChart = Charting.createTimeSeriesPlot(timeseries,
+                                    new HorizontalPosition(position.longitude.degrees,
+                                            position.latitude.degrees, DefaultGeographicCRS.WGS84));
+                            timeseriesChart.setBackgroundPaint(Color.white);
+
+                            /*
+                             * Save the chart at the same size as the panel
+                             */
+                            /*
+                             * Change to a UUID once it works
+                             */
+                            timeseriesLocation = "EDAL/Charts/TS-" + edalLayerName
+                                    + System.currentTimeMillis();
+                            File timeseriesFile = WorldWind.getDataFileStore().newFile(
+                                    timeseriesLocation);
+                            ChartUtilities.saveChartAsPNG(timeseriesFile, timeseriesChart, width,
+                                    height);
+                            /*
+                             * Now save a fixed-ratio preview chart
+                             */
+                            File timeseriesPreviewFile = WorldWind.getDataFileStore().newFile(
+                                    timeseriesLocation + "-preview");
+                            ChartUtilities
+                                    .saveChartAsPNG(
+                                            timeseriesPreviewFile,
+                                            timeseriesChart,
+                                            (int) (FeatureInfoBalloon.TARGET_WIDTH / FeatureInfoBalloon.PREVIEW_SCALE),
+                                            (int) (FeatureInfoBalloon.TARGET_HEIGHT / FeatureInfoBalloon.PREVIEW_SCALE));
+                        }
+                    }
+                    if (metadata.getVerticalDomain() != null) {
+                        /*
+                         * Generate a profile graph
+                         */
+                        Collection<? extends ProfileFeature> profiles = catalogue.getProfiles(
+                                edalLayerName, position);
+                        if (profiles != null && profiles.size() > 0) {
+                            JFreeChart profileChart = Charting.createVerticalProfilePlot(profiles,
+                                    new HorizontalPosition(position.longitude.degrees,
+                                            position.latitude.degrees, DefaultGeographicCRS.WGS84));
+                            profileChart.setBackgroundPaint(Color.white);
+                            /*
+                             * Change to a UUID once it works
+                             */
+                            profileLocation = "EDAL/Charts/PF-" + edalLayerName
+                                    + System.currentTimeMillis();
+                            File profileFile = WorldWind.getDataFileStore()
+                                    .newFile(profileLocation);
+                            ChartUtilities.saveChartAsPNG(profileFile, profileChart, width, height);
+                            /*
+                             * Now save a fixed-ratio preview chart
+                             */
+                            File profilePreviewFile = WorldWind.getDataFileStore().newFile(
+                                    profileLocation + "-preview");
+                            ChartUtilities
+                                    .saveChartAsPNG(
+                                            profilePreviewFile,
+                                            profileChart,
+                                            (int) (FeatureInfoBalloon.TARGET_WIDTH / FeatureInfoBalloon.PREVIEW_SCALE),
+                                            (int) (FeatureInfoBalloon.TARGET_HEIGHT / FeatureInfoBalloon.PREVIEW_SCALE));
+                        }
+                    }
+                    balloon.setGraphs(profileLocation, timeseriesLocation);
+                } catch (EdalException e) {
+                    /*
+                     * Another problem generating graphs
+                     */
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    /*
+                     * Problem writing chart to data file store
+                     */
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
+
+    private Thread sliderTimer = null;
+
     @Override
     public void sliderChanged(String id, double value) {
+        resetSliderTimer();
         switch (id) {
-        case DEPTH_SLIDER:
-            setDepth(value);
-            drawLayer();
+        case ELEVATION_SLIDER:
+            for (RescModel model : elevationLinkedModels) {
+                model.setElevation(value);
+                model.drawLayer();
+                if (model != this) {
+                    model.elevationSlider.setSliderValue(value);
+                }
+            }
             break;
         case TIME_SLIDER:
-            setTime(new DateTime((long) value));
-            drawLayer();
+            for (RescModel model : timeLinkedModels) {
+                model.setTime(new DateTime((long) value));
+                model.drawLayer();
+                if (model != this) {
+                    model.timeSlider.setSliderValue(value);
+                }
+            }
             break;
         default:
             break;
         }
+        sliderTimer.start();
+    }
+
+    private void resetSliderTimer() {
+        if (sliderTimer != null) {
+            sliderTimer.interrupt();
+        }
+        sliderTimer = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                /*
+                 * Sleep for 1 second and then call the sliderSettled method
+                 */
+                try {
+                    Thread.sleep(500L);
+                    sliderSettled();
+                } catch (InterruptedException e) {
+                    /*
+                     * Don't do anything - the timer was interrupted
+                     * deliberately
+                     */
+                }
+            }
+        });
+    }
+
+    private void sliderSettled() {
+        System.out.println("Slider stopped moving for 500ms");
+        /*
+         * TODO go and cache all of the times at this elevation and all of the
+         * elevations at this time.
+         * 
+         * This means that we don't cache everything, but anything that might be
+         * used gets cached when required
+         */
     }
 }

@@ -48,6 +48,8 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 
+import uk.ac.rdg.resc.LinkedView.LinkedViewState;
+
 /**
  * Currently just displays a cog and then a layer selector. Functional, but
  * needs to be made nicer (big icons for touchscreen - a Friday afternoon job)
@@ -60,9 +62,13 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
     protected VideoWallCatalogue catalogue;
 
     private ImageAnnotation configButton;
+    
+    
+    private ImageAnnotation linkStateButton;
     private ImageAnnotation linkButton;
     private ImageAnnotation antilinkButton;
     private ImageAnnotation unlinkButton;
+    
     private ImageAnnotation flatButton;
 
     private ScreenAnnotation layerSelector;
@@ -70,7 +76,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
 
     protected Dimension layerSelectorSize;
     private Color color = Color.decode("#b0b0b0");
-    private Color highlightColor = Color.decode("#ffffff");
+//    private Color highlightColor = Color.decode("#ffffff");
     private char layerEnabledSymbol = '\u25a0';
     private char layerDisabledSymbol = '\u25a1';
     private Font font = new Font("Monospace", Font.PLAIN, 24);
@@ -101,24 +107,24 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         configButton.setScreenPoint(new Point(0, 0));
         configButton.setPickEnabled(true);
         addRenderable(configButton);
+        
+        linkStateButton = new ImageAnnotation("images/link.png");
+        linkStateButton.setPickEnabled(true);
+        addRenderable(linkStateButton);
 
         linkButton = new ImageAnnotation("images/link.png");
-        linkButton.setScreenPoint(new Point(50, 0));
         linkButton.setPickEnabled(true);
-        addRenderable(linkButton);
+//        addRenderable(linkButton);
 
         antilinkButton = new ImageAnnotation("images/antilink.png");
-        antilinkButton.setScreenPoint(new Point(100, 0));
         antilinkButton.setPickEnabled(true);
-        addRenderable(antilinkButton);
+//        addRenderable(antilinkButton);
 
         unlinkButton = new ImageAnnotation("images/unlink.png");
-        unlinkButton.setScreenPoint(new Point(150, 0));
         unlinkButton.setPickEnabled(true);
-        addRenderable(unlinkButton);
+//        addRenderable(unlinkButton);
         
         flatButton = new ImageAnnotation("images/flat.png");
-        flatButton.setScreenPoint(new Point(200, 0));
         flatButton.setPickEnabled(true);
         addRenderable(flatButton);
 
@@ -210,21 +216,44 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 displayLayerSelector();
             }
+        } else if (event.hasObjects() && event.getTopObject() == linkStateButton) {
+            if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
+                removeRenderable(linkStateButton);
+                addRenderable(linkButton);
+                addRenderable(antilinkButton);
+                addRenderable(unlinkButton);
+            }
         } else if (event.hasObjects() && event.getTopObject() == linkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                wwd.setLinkedView();
+                wwd.getLinkedView().setLinkState(LinkedViewState.LINKED);
+                linkStateButton.setImageSource("images/link.png");
+                removeRenderable(linkButton);
+                removeRenderable(antilinkButton);
+                removeRenderable(unlinkButton);
+                addRenderable(linkStateButton);
             }
         } else if (event.hasObjects() && event.getTopObject() == antilinkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                wwd.setAntilinkedView();
+                wwd.getLinkedView().setLinkState(LinkedViewState.ANTILINKED);
+                linkStateButton.setImageSource("images/antilink.png");
+                removeRenderable(linkButton);
+                removeRenderable(antilinkButton);
+                removeRenderable(unlinkButton);
+                addRenderable(linkStateButton);
             }
         } else if (event.hasObjects() && event.getTopObject() == unlinkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                wwd.setUnlinkedView();
+                wwd.getLinkedView().setLinkState(LinkedViewState.UNLINKED);
+                linkStateButton.setImageSource("images/unlink.png");
+                removeRenderable(linkButton);
+                removeRenderable(antilinkButton);
+                removeRenderable(unlinkButton);
+                addRenderable(linkStateButton);
             }
         } else if (event.hasObjects() && event.getTopObject() == flatButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                wwd.toggleFlat();
+                RescModel model = wwd.getModel();
+                model.setFlat(!model.isFlat());
             }
         } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)
                 && this.layerSelector.getAttributes().isHighlighted()) {
@@ -480,18 +509,21 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
          * TODO Add the other buttons
          */
         this.layerSelector.setScreenPoint(computeLocation(dc.getView().getViewport()));
-        this.configButton.setScreenPoint(getButtonLocation(dc, 0));
-        this.linkButton.setScreenPoint(getButtonLocation(dc, 50));
-        this.antilinkButton.setScreenPoint(getButtonLocation(dc, 100));
-        this.unlinkButton.setScreenPoint(getButtonLocation(dc, 150));
-        this.flatButton.setScreenPoint(getButtonLocation(dc, 200));
+        this.configButton.setScreenPoint(getButtonLocation(dc, 0, 0));
+        int x = 100;
+        this.linkStateButton.setScreenPoint(getButtonLocation(dc, x, 0));
+        this.linkButton.setScreenPoint(getButtonLocation(dc, x, 0));
+        this.antilinkButton.setScreenPoint(getButtonLocation(dc, x, 70));
+        this.unlinkButton.setScreenPoint(getButtonLocation(dc, x, 140));
+        x += 130;
+        this.flatButton.setScreenPoint(getButtonLocation(dc, x, 0));
         super.render(dc);
     }
 
-    private Point getButtonLocation(DrawContext dc, int offset) {
-        int x = this.borderWidth + configButton.getPreferredSize(dc).width + offset;
+    private Point getButtonLocation(DrawContext dc, int xOffset, int yOffset) {
+        int x = this.borderWidth + configButton.getPreferredSize(dc).width + xOffset;
         int y = (int) dc.getView().getViewport().getHeight()
-                - configButton.getPreferredSize(dc).height - this.borderWidth;
+                - configButton.getPreferredSize(dc).height - this.borderWidth - yOffset;
         return new Point(x, y);
     }
 

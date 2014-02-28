@@ -53,7 +53,7 @@ public class LinkedView extends BasicOrbitView {
         LINKED, ANTILINKED, UNLINKED
     }
 
-    private LinkedViewState linkState = LinkedViewState.UNLINKED;
+    private LinkedViewState linkState = LinkedViewState.LINKED;
 
     public void setLinkState(LinkedViewState linkState) {
         this.linkState = linkState;
@@ -84,6 +84,10 @@ public class LinkedView extends BasicOrbitView {
         }
         firePropertyChange(AVKey.VIEW, null, this);
     }
+    
+    public LinkedViewState getLinkedViewState() {
+        return linkState;
+    }
 
     /**
      * Links views together.
@@ -94,7 +98,7 @@ public class LinkedView extends BasicOrbitView {
         if (this != view) {
             linkedViews.add(view);
             view.linkedViews.add(this);
-            linkState = LinkedViewState.LINKED;
+//            linkState = LinkedViewState.LINKED;
             view.linkState = LinkedViewState.LINKED;
         }
     }

@@ -34,8 +34,6 @@ import gov.nasa.worldwind.geom.Position;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 
-import uk.ac.rdg.resc.LinkedView.LinkedViewState;
-
 @SuppressWarnings("serial")
 public class RescWorldWindow extends WorldWindowGLCanvas {
 
@@ -79,22 +77,6 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
 
     public LinkedView getLinkedView() {
         return linkedView;
-    }
-
-    public void setLinkedView() {
-        linkedView.setLinkState(LinkedViewState.LINKED);
-    }
-
-    public void setUnlinkedView() {
-        linkedView.setLinkState(LinkedViewState.UNLINKED);
-    }
-
-    public void setAntilinkedView() {
-        linkedView.setLinkState(LinkedViewState.ANTILINKED);
-    }
-
-    public void toggleFlat() {
-        getModel().setFlat(!getModel().isFlat());
     }
 
     @Override

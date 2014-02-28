@@ -28,17 +28,13 @@
 
 package uk.ac.rdg.resc;
 
-import gov.nasa.worldwind.View;
-import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
-import gov.nasa.worldwind.view.orbit.BasicOrbitView;
-
 import java.awt.Color;
 import java.awt.GridLayout;
 import java.io.IOException;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
@@ -47,36 +43,37 @@ public class MultiGlobeFrame extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private List<RescWorldWindow> panels = new ArrayList<>();
-    private int rows = 2;
-    private int columns = 2;
-
-    private int panelWidth = 500;
-    private int panelHeight = 500;
+    private int rows;
+    private int columns;
 
     private VideoWallCatalogue featureCatalogue;
-    private View view = new BasicOrbitView();
 
     public MultiGlobeFrame(VideoWallCatalogue featureCatalogue) throws IOException, EdalException {
-        /*
-         * Set the location of the config file.
-         * 
-         * This needs to be done before any WorldWindow objects are created.
-         * 
-         * TODO Is it OK here, or might it need to go higher up the chain?
-         */
-
         this.featureCatalogue = featureCatalogue;
-        
+
         setBackground(Color.lightGray);
-        
-        setShape(1,1);
+
+        setShape(1, 1);
     }
-    
-    public void addLayers() {
-        setShape(2,2);
-//        getPanel(0, 1).setOppositeView();
-//        setFlat(true, 1, 0);
-//        setFlat(true, 1, 1);
+
+    public void addRow() {
+        setShape(rows + 1, columns);
+    }
+
+    public void removeRow() {
+        if (rows > 1) {
+            setShape(rows - 1, columns);
+        }
+    }
+
+    public void addColumn() {
+        setShape(rows, columns + 1);
+    }
+
+    public void removeColumn() {
+        if (columns > 1) {
+            setShape(rows, columns - 1);
+        }
     }
 
     public int getColumns() {
@@ -88,26 +85,31 @@ public class MultiGlobeFrame extends JPanel {
     }
 
     public RescModel getModel(int row, int column) {
-        return (RescModel) getPanel(row, column).getModel();
-    }
-
-//    public void setData(int row, int column, String field) {
-//        getModel(row, column).setDataLayer(field);
-//    }
-
-    public void setFlat(boolean flat, int row, int column) {
-        getModel(row, column).setFlat(flat);
-    }
-
-    public void toggleFlat(int row, int column) {
-        RescModel model = getModel(row, column);
-        model.setFlat(!model.isFlat());
+        return getPanel(row, column).getModel();
     }
 
     public void setShape(int rows, int columns) {
         this.rows = rows;
         this.columns = columns;
-        reJig();
+
+        while (panels.size() > rows * columns) {
+            panels.remove(panels.size() - 1);
+            remove(getComponentCount() - 1);
+        }
+        GridLayout gridLayout = new GridLayout(rows, columns, 2, 2);
+        setLayout(gridLayout);
+        
+        while (panels.size() < rows * columns) {
+            RescWorldWindow wwd = new RescWorldWindow(new LinkedView());
+            wwd.setModel(new RescModel(featureCatalogue, wwd, this));
+            wwd.setVisible(true);
+            for (int i = 0; i < panels.size(); i++) {
+                panels.get(i).getLinkedView().addLinkedView(wwd.getLinkedView());
+            }
+            panels.add(wwd);
+            add(wwd);
+        }
+        this.validate();
     }
 
     public RescWorldWindow getPanel(int row, int column) {
@@ -121,29 +123,18 @@ public class MultiGlobeFrame extends JPanel {
     private int getIndex(int row, int column) {
         return row * rows + column;
     }
-
-    public void reJig() {
-        while (panels.size() > rows * columns) {
-            panels.remove(panels.size() - 1);
-            remove(getComponentCount() - 1);
-        }
-        GridLayout gridLayout = new GridLayout(rows, columns, 2, 2);
-        setLayout(gridLayout);
-        
-        while (panels.size() < rows * columns) {
-            RescWorldWindow wwd = new RescWorldWindow(new LinkedView());
-            wwd.setPreferredSize(new java.awt.Dimension(panelWidth, panelHeight));
-            wwd.setModel(new RescModel(featureCatalogue, wwd));
-            wwd.setVisible(true);
-            panels.add(wwd);
-        }
-        for (RescWorldWindow panel : panels) {
-            for (RescWorldWindow panelToSync : panels) {
-                panel.getLinkedView().addLinkedView(panelToSync.getLinkedView());
+    
+    public List<RescModel> getAllModels() {
+        return new AbstractList<RescModel>() {
+            @Override
+            public RescModel get(int index) {
+                return panels.get(index).getModel();
             }
-            panel.setSize(panelWidth, panelHeight);
-            add(panel);
-        }
-        this.validate();
+
+            @Override
+            public int size() {
+                return panels.size();
+            }
+        };
     }
 }

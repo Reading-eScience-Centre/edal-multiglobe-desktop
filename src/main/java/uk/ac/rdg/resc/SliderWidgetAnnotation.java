@@ -29,15 +29,11 @@
 package uk.ac.rdg.resc;
 
 import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.event.SelectEvent;
-import gov.nasa.worldwind.event.SelectListener;
-import gov.nasa.worldwind.layers.AnnotationLayer;
 import gov.nasa.worldwind.render.Annotation;
 import gov.nasa.worldwind.render.AnnotationAttributes;
 import gov.nasa.worldwind.render.AnnotationFlowLayout;
 import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.render.ScreenAnnotation;
-import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -45,22 +41,25 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 
-import org.bouncycastle.jce.provider.JDKPKCS12KeyStore.BCPKCS12KeyStore;
-
 import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
 
+/**
+ * Encapsualtes a {@link SliderWidget} and provides layout management and (TODO)
+ * text annotations showing the current value
+ * 
+ * @author Guy
+ */
 public class SliderWidgetAnnotation extends ScreenAnnotation {
 
-    private static final int EDGE_DISTANCE_PX = 100;
+    private static final int EDGE_DISTANCE_PX = 50;
     private static final int SLIDER_WIDTH = 20;
 
     private final SliderWidget sliderWidget;
     private final String orientation;
     private String position;
 
-
-    public SliderWidgetAnnotation(String id, String orientation, String position, double min, double max, RescWorldWindow wwd,
-            final SliderWidgetHandler handler) {//, AnnotationLayer parentLayer) {
+    public SliderWidgetAnnotation(String id, String orientation, String position, double min,
+            double max, RescWorldWindow wwd, final SliderWidgetHandler handler) {//, AnnotationLayer parentLayer) {
         super("", new Point());
 
         this.orientation = orientation;
@@ -85,14 +84,27 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
         setLayout(new AnnotationFlowLayout(orientation, AVKey.CENTER, 0, 0)); // hgap, vgap
         addChild(sliderWidget);
     }
-    
+
+    public boolean equalLimits(SliderWidgetAnnotation other) {
+        return other.sliderWidget.max == sliderWidget.max
+                && other.sliderWidget.min == sliderWidget.min;
+    }
+
+    public void setReversed(boolean reversed) {
+        sliderWidget.setReversed(reversed);
+    }
+
     public void setLimits(double min, double max) {
         sliderWidget.setMin(min);
         sliderWidget.setMax(max);
     }
-    
+
     public void setSliderValue(double value) {
         sliderWidget.setValue(value);
+    }
+
+    public double getSliderValue() {
+        return sliderWidget.value;
     }
 
     @Override
@@ -105,7 +117,7 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
 
         if (orientation.equals(AVKey.HORIZONTAL)) {
             sliderWidget.getAttributes().setSize(
-                    new Dimension(viewport.width * 3 / 4, SLIDER_WIDTH));
+                    new Dimension(viewport.width * 1 / 2, SLIDER_WIDTH));
             if (position.equals(AVKey.SOUTH)) {
                 setScreenPoint(new Point(viewport.x + viewport.width / 2, EDGE_DISTANCE_PX));
             } else if (position.equals(AVKey.NORTH)) {
@@ -120,7 +132,7 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
             }
         } else {
             sliderWidget.getAttributes().setSize(
-                    new Dimension(SLIDER_WIDTH, viewport.height * 3 / 4));
+                    new Dimension(SLIDER_WIDTH, viewport.height * 1 / 2));
             if (position.equals(AVKey.SOUTH)) {
                 setScreenPoint(new Point(viewport.x + viewport.width / 2, EDGE_DISTANCE_PX));
             } else if (position.equals(AVKey.NORTH)) {

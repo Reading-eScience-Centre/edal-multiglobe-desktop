@@ -50,7 +50,7 @@ public class RescControlPanel extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 for (int column = 0; column < RescControlPanel.this.globePanels.getColumns(); column++) {
                     for (int row = 0; row < RescControlPanel.this.globePanels.getRows(); row++) {
-                        RescControlPanel.this.globePanels.toggleFlat(row, column);
+//                        RescControlPanel.this.globePanels.toggleFlat(row, column);
                     }
                 }
             }
@@ -60,7 +60,7 @@ public class RescControlPanel extends JPanel {
         layersButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                RescControlPanel.this.globePanels.addLayers();
+//                RescControlPanel.this.globePanels.addLayers();
 //                for (int column = 0; column < RescControlPanel.this.globePanels.getColumns(); column++) {
 //                    for (int row = 0; row < RescControlPanel.this.globePanels.getRows(); row++) {
 //                    }

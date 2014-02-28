@@ -28,21 +28,18 @@
 
 package uk.ac.rdg.resc;
 
-import gov.nasa.worldwind.BasicFactory;
-import gov.nasa.worldwind.Configuration;
-import gov.nasa.worldwind.WorldWind;
-import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.layers.Layer;
-import gov.nasa.worldwind.layers.LayerList;
-
 import java.awt.BorderLayout;
+import java.awt.Button;
+import java.awt.Color;
 import java.awt.Frame;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 
+import javax.swing.BoxLayout;
 import javax.swing.JFrame;
+import javax.swing.JPanel;
 import javax.xml.bind.JAXBException;
-
-import org.w3c.dom.Element;
 
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 
@@ -50,17 +47,71 @@ import uk.ac.rdg.resc.edal.exceptions.EdalException;
 public class VideoWall extends JFrame {
     private VideoWallCatalogue datasetLoader;
     private MultiGlobeFrame globePanels;
-    private RescControlPanel controlPanel;
+//    private RescControlPanel controlPanel;
+    private JPanel addRemoveRowPanel;
+    private JPanel addRemoveColumnPanel;
     
     public VideoWall() throws IOException, EdalException, JAXBException {
         
         datasetLoader = new VideoWallCatalogue();
         globePanels = new MultiGlobeFrame(datasetLoader);
-        controlPanel = new RescControlPanel(this, globePanels);
+        
+        addRemoveRowPanel = new JPanel();
+        Button addRowButton = new Button("+");
+        addRowButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                globePanels.addRow();
+            }
+        });
+        addRowButton.setBackground(Color.black);
+        addRowButton.setForeground(Color.lightGray);
+        addRowButton.setSize(100, 50);
+        Button removeRowButton = new Button("-");
+        removeRowButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                globePanels.removeRow();
+            }
+        });
+        removeRowButton.setBackground(Color.black);
+        removeRowButton.setForeground(Color.lightGray);
+        addRemoveRowPanel.setLayout(new BoxLayout(addRemoveRowPanel, BoxLayout.PAGE_AXIS));
+        addRemoveRowPanel.add(removeRowButton);
+        addRemoveRowPanel.add(addRowButton);
+        
+        addRemoveColumnPanel = new JPanel();
+        Button addColumnButton = new Button("+");
+        addColumnButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                globePanels.addColumn();
+            }
+        });
+        addColumnButton.setBackground(Color.black);
+        addColumnButton.setForeground(Color.lightGray);
+        Button removeColumnButton = new Button(" - ");
+        removeColumnButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                globePanels.removeColumn();
+            }
+        });
+        removeColumnButton.setBackground(Color.black);
+        removeColumnButton.setForeground(Color.lightGray);
+        addRemoveColumnPanel.setLayout(new BoxLayout(addRemoveColumnPanel, BoxLayout.LINE_AXIS));
+        
+        addRemoveColumnPanel.add(removeColumnButton);
+        addRemoveColumnPanel.add(addColumnButton);
+        
         
         setLayout(new BorderLayout());
         add(globePanels, BorderLayout.CENTER);
-        add(controlPanel, BorderLayout.WEST);
+        add(addRemoveColumnPanel, BorderLayout.EAST);
+        add(addRemoveRowPanel, BorderLayout.SOUTH);
+        
+//        controlPanel = new RescControlPanel(this, globePanels);
+//        add(controlPanel, BorderLayout.WEST);
     }
     
     public static void main(String[] args) {

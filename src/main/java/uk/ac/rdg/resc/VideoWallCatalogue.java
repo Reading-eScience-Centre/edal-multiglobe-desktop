@@ -85,11 +85,11 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
 
     @Override
     public void datasetLoaded(Dataset dataset, Collection<NcwmsVariable> variables) {
-        //        System.out.println("Dataset "+dataset.getId()+" loaded");
         datasets.put(dataset.getId(), dataset);
         for (NcwmsVariable variable : variables) {
             String layerName = getLayerName(dataset.getId(), variable.getId());
             this.variables.put(layerName, variable);
+            EdalDataLayer.precacheLayer(layerName, this);
         }
         addDatasetToMenu(dataset);
     }

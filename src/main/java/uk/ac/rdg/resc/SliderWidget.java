@@ -62,6 +62,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
 
     private final String id;
 
+    private boolean reversed = false;
     protected double value;
     protected double min;
     protected double max;
@@ -130,6 +131,10 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         wwd.addSelectListener(this);
     }
 
+    public void setReversed(boolean reversed) {
+        this.reversed = reversed;
+    }
+    
     public double getValue() {
         return value;
     }
@@ -255,7 +260,11 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
 
     protected int computeSliderRelativePos(int barSize) {
         double factor = (value - min) / (max - min);
-        return (int) (factor * barSize);
+        if(reversed) {
+            return (int) ((1.0-factor) * barSize);
+        } else {
+            return (int) (factor * barSize);
+        }
     }
 
     @Override
@@ -278,7 +287,13 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                         percMove = diff / (double) getAttributes().getSize().height;
                     }
                     double valueDiff = percMove * (max - min);
-                    double value = getValue() + valueDiff;
+                    
+                    double value;
+                    if(reversed){
+                        value = getValue() - valueDiff;
+                    } else {
+                        value = getValue() + valueDiff;
+                    }
                     lastDragPoint = point;
                     setValue(value);
                     if (handler != null) {
