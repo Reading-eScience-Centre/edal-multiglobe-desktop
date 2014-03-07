@@ -73,6 +73,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     private VideoWallCatalogue catalogue;
     private boolean flat = false;
 
+    //    private EdalFeatureLayer featureLayer = null;
+
     private EdalDataLayer currentDataLayer = null;
     private VariableMetadata currentMetadata = null;
     private String edalLayerName = null;
@@ -134,9 +136,10 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     public void setDataLayer(String layerName) {
+        //        featureLayer = new EdalFeatureLayer(layerName, catalogue);
+        //        getLayers().add(featureLayer);
         boolean newLayer = false;
         if (layerName != null && !layerName.equals(edalLayerName)) {
-            //            EdalDataLayer.precacheLayer(layerName, catalogue);
             newLayer = true;
 
             /*
@@ -159,7 +162,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              * required.
              */
             annotationLayer.removeAnnotation(elevationSlider);
+            elevation = null;
             annotationLayer.removeAnnotation(timeSlider);
+            time = null;
 
             VerticalDomain verticalDomain = currentMetadata.getVerticalDomain();
             if (verticalDomain != null) {
@@ -236,7 +241,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         drawLayer();
 
         if (newLayer) {
-            //            EdalDataLayer.precacheLayer(layerName, catalogue);
+            EdalDataLayer.premptivelyCacheLayer(layerName, elevation, time, catalogue);
         }
         /*
          * TODO Add time, elevation, etc to method signature
@@ -258,6 +263,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         } else {
             this.time = time;
         }
+        //        featureLayer.setTime(time);
     }
 
     private void setElevation(double depth) {
@@ -272,6 +278,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         } else {
             this.elevation = depth;
         }
+        //        featureLayer.setElevation(elevation);
     }
 
     private void drawLayer() {
@@ -287,6 +294,11 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              */
             currentDataLayer = new EdalDataLayer(edalLayerName, catalogue, elevation, time);
             getLayers().add(currentDataLayer);
+
+            //            featureLayer.setElevation(elevation);
+            //            featureLayer.setTime(time);
+            //            analytic = new EdalAnalyticSurfaceLayer(edalLayerName, catalogue, elevation, time);
+            //            getLayers().add(analytic);
         }
     }
 
@@ -500,7 +512,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     private void sliderSettled() {
-        System.out.println("Slider stopped moving for 500ms");
         /*
          * TODO go and cache all of the times at this elevation and all of the
          * elevations at this time.
@@ -508,5 +519,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
          * This means that we don't cache everything, but anything that might be
          * used gets cached when required
          */
+        //        System.out.println("Slider stopped moving for 500ms");
+
+        EdalDataLayer.premptivelyCacheLayer(edalLayerName, elevation, time, catalogue);
     }
 }

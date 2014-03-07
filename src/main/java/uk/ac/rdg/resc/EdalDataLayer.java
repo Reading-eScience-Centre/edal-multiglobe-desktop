@@ -65,13 +65,17 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
     private Double elevation;// = 5.0;
 
     /**
-     * Creates an {@link EdalDataLayer} and creates all necessary data in the
-     * cache.
+     * Caches the parts of a layer which a user is likely to access next. This
+     * takes a layer name, elevation, and time, and caches images for: 1) all
+     * elevations at the given time, and 2) all times at the given elevation.
      * 
      * @param layerName
      * @param catalogue
+     * @param elevation
+     * @param time
      */
-    public static void precacheLayer(final String layerName, final VideoWallCatalogue catalogue) {
+    public static void premptivelyCacheLayer(final String layerName, final Double elevation,
+            final DateTime time, final VideoWallCatalogue catalogue) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -85,12 +89,6 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
                      */
                     return;
                 }
-                /*
-                 * Now cache level 0 data for all possible levels. This
-                 * corresponds to a resolution of 36 degrees / 128 pixels in
-                 * radians
-                 */
-                //                double resolution = 36 * Math.PI / (180.0 * 128);
 
                 List<Double> elevations = new ArrayList<>();
                 VerticalDomain verticalDomain = metadata.getVerticalDomain();
@@ -131,17 +129,17 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
                 }
                 Collections.reverse(elevations);
                 for (Double z : elevations) {
-                    for (DateTime t : times) {
-                        /*
-                         * This gets fired off in it's own thread
-                         */
-                        EdalDataLayer layer = new EdalDataLayer(layerName, catalogue, z, t);
-                        for (TextureTile tile : layer.getTopLevels()) {
-                            layer.retrieveRemoteTexture(tile, null);
-                        }
+                    EdalDataLayer layer = new EdalDataLayer(layerName, catalogue, z, time);
+                    for (TextureTile tile : layer.getTopLevels()) {
+                        layer.retrieveRemoteTexture(tile, null);
                     }
                 }
-                System.out.println("Done precaching "+layerName);
+                for (DateTime t : times) {
+                    EdalDataLayer layer = new EdalDataLayer(layerName, catalogue, elevation, t);
+                    for (TextureTile tile : layer.getTopLevels()) {
+                        layer.retrieveRemoteTexture(tile, null);
+                    }
+                }
             }
         }).start();
     }
@@ -282,8 +280,8 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
 
         AVList params = new AVListImpl();
 
-        params.setValue(AVKey.TILE_WIDTH, 128);
-        params.setValue(AVKey.TILE_HEIGHT, 128);
+        params.setValue(AVKey.TILE_WIDTH, 360);
+        params.setValue(AVKey.TILE_HEIGHT, 180);
         params.setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
         params.setValue(AVKey.SERVICE, "*");
         params.setValue(AVKey.DATASET_NAME, layerId);
@@ -291,7 +289,7 @@ public class EdalDataLayer extends BasicTiledImageLayer implements SelectListene
         params.setValue(AVKey.NUM_LEVELS, 10);
         params.setValue(AVKey.NUM_EMPTY_LEVELS, 0);
         params.setValue(AVKey.LEVEL_ZERO_TILE_DELTA,
-                new LatLon(Angle.fromDegrees(36d), Angle.fromDegrees(36d)));
+                new LatLon(Angle.fromDegrees(180d), Angle.fromDegrees(360d)));
         params.setValue(AVKey.SECTOR, Sector.FULL_SPHERE);
 
         return new LevelSet(params);

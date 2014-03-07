@@ -12,6 +12,7 @@ import gov.nasa.worldwind.event.SelectEvent;
 import gov.nasa.worldwind.event.SelectListener;
 import gov.nasa.worldwind.geom.Sector;
 import gov.nasa.worldwind.layers.RenderableLayer;
+import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwindx.examples.analytics.AnalyticSurface;
 import gov.nasa.worldwindx.examples.analytics.AnalyticSurface.GridPointAttributes;
 import gov.nasa.worldwindx.examples.analytics.AnalyticSurfaceAttributes;
@@ -53,9 +54,12 @@ public class EdalAnalyticSurfaceLayer extends RenderableLayer implements SelectL
     private Double elevation = 5.0;
     private AnalyticSurface surface;
 
-    public EdalAnalyticSurfaceLayer(String layerId, VideoWallCatalogue catalogue) {
+    public EdalAnalyticSurfaceLayer(String layerId, VideoWallCatalogue catalogue, Double elevation, DateTime time) {
         super();
         this.catalogue = catalogue;
+        this.elevation = elevation;
+        this.time = time;
+        
         setName(layerId);
         setPickEnabled(true);
 
@@ -70,6 +74,7 @@ public class EdalAnalyticSurfaceLayer extends RenderableLayer implements SelectL
         surface.setSurfaceAttributes(attr);
 
         addRenderable(surface);
+        setData(layerId);
     }
 
     public String getDataLayerName() {
@@ -170,6 +175,7 @@ public class EdalAnalyticSurfaceLayer extends RenderableLayer implements SelectL
 
     private Iterable<? extends GridPointAttributes> getValuesFromMapFeature(MapFeature mapFeature,
             String member, ColourScheme colourScheme) {
+        System.out.println("Getting values from map feature");
         ArrayList<AnalyticSurface.GridPointAttributes> attributesList = new ArrayList<AnalyticSurface.GridPointAttributes>();
 
         Array2D<Number> values = mapFeature.getValues(member);
@@ -184,7 +190,13 @@ public class EdalAnalyticSurfaceLayer extends RenderableLayer implements SelectL
             }
         }
 
+        System.out.println("Got values from map feature");
         return attributesList;
+    }
+    
+    @Override
+    public void render(DrawContext dc) {
+        super.render(dc);
     }
 
     @Override

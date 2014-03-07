@@ -46,8 +46,10 @@ import uk.ac.rdg.resc.edal.dataset.Dataset;
 import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
 import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.domain.Extent;
+import uk.ac.rdg.resc.edal.exceptions.DataReadingException;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
+import uk.ac.rdg.resc.edal.feature.GridFeature;
 import uk.ac.rdg.resc.edal.feature.MapFeature;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
@@ -70,17 +72,28 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
     private Map<String, NcwmsVariable> variables;
     private ActiveLayerMenuItem rootMenuNode = null;
 
+    private Map<String, GridFeature> gridFeatures;
+
     public VideoWallCatalogue() throws IOException, JAXBException {
         DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
 
         config = NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml"));
         config.setDatasetLoadedHandler(this);
         config.loadDatasets();
-        
+
         datasets = new HashMap<>();
         variables = new HashMap<>();
+        gridFeatures = new HashMap<>();
 
         rootMenuNode = new ActiveLayerMenuItem("Root", "root", false, false);
+    }
+
+    public GridFeature getGridFeature(String layerName) throws WmsLayerNotFoundException {
+        if (gridFeatures.containsKey(layerName)) {
+            return gridFeatures.get(layerName);
+        } else {
+            throw new WmsLayerNotFoundException("No grid feature available for layer " + layerName);
+        }
     }
 
     @Override
@@ -89,20 +102,53 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         for (NcwmsVariable variable : variables) {
             String layerName = getLayerName(dataset.getId(), variable.getId());
             this.variables.put(layerName, variable);
-            EdalDataLayer.precacheLayer(layerName, this);
+
+            Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
+                    .getMapFeatureType(variable.getId());
+            if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
+                try {
+                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
+                    gridFeatures.put(layerName, gridFeature);
+                } catch (DataReadingException e) {
+                    /*
+                     * TODO log this properly, and ignore can't read data, but
+                     * maybe it will work later...
+                     * 
+                     * Or just make this layer unavailable...
+                     */
+                    e.printStackTrace();
+                }
+            } else {
+                /*
+                 * Not a grid feature. For now we ignore it and retrieve as
+                 * normal, but we may want to add different methods for
+                 * point/profile feature
+                 */
+            }
         }
+        System.out.println(dataset.getId()+" loaded");
         addDatasetToMenu(dataset);
     }
 
     @Override
     public FeaturesAndMemberName getFeaturesForLayer(String id, PlottingDomainParams params)
             throws EdalException {
-        Dataset dataset = getDatasetFromLayerName(id);
-        String varId = getVariableFromId(id);
+        String varId = getVariableIdFromLayerName(id);
+        if (gridFeatures.containsKey(id)) {
+            /*
+             * If we have an in-memory grid feature, just extract a subset of it
+             */
+            MapFeature mapFeature = gridFeatures.get(id).extractMapFeature(
+                    CollectionUtils.setOf(varId), params.getImageGrid(), params.getTargetZ(),
+                    params.getTargetT());
+            return new FeaturesAndMemberName(CollectionUtils.setOf(mapFeature), varId);
+        } else {
+            Dataset dataset = getDatasetFromLayerName(id);
 
-        Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
-                CollectionUtils.setOf(varId), params);
-        return new FeaturesAndMemberName(mapFeatures, varId);
+            Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
+                    CollectionUtils.setOf(varId), params);
+            return new FeaturesAndMemberName(mapFeatures, varId);
+        }
     }
 
     public Number getLayerValue(String layerId, Position position, Double z, DateTime time)
@@ -118,7 +164,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
          * missing...
          */
         Dataset dataset = getDatasetFromLayerName(layerId);
-        String varId = getVariableFromId(layerId);
+        String varId = getVariableIdFromLayerName(layerId);
         Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
                 CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1, new BoundingBoxImpl(
                         position.longitude.degrees - 1e-8, position.latitude.degrees - 1e-8,
@@ -144,26 +190,29 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
     public Collection<? extends ProfileFeature> getProfiles(String layerId, Position position)
             throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
-        String varId = getVariableFromId(layerId);
+        String varId = getVariableIdFromLayerName(layerId);
         VariableMetadata variableMetadata = dataset.getVariableMetadata(varId);
         DateTime latest = variableMetadata.getTemporalDomain().getExtent().getHigh();
-        Collection<? extends ProfileFeature> profileFeatures = dataset
-                .extractProfileFeatures(CollectionUtils.setOf(varId), new PlottingDomainParams(1,
-                        1, null, null, null, new HorizontalPosition(position.longitude.degrees,
-                                position.latitude.degrees, DefaultGeographicCRS.WGS84), null, latest));
+        Collection<? extends ProfileFeature> profileFeatures = dataset.extractProfileFeatures(
+                CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1, null, null, null,
+                        new HorizontalPosition(position.longitude.degrees,
+                                position.latitude.degrees, DefaultGeographicCRS.WGS84), null,
+                        latest));
         return profileFeatures;
     }
-    
+
     public Collection<? extends PointSeriesFeature> getTimeseries(String layerId, Position position)
             throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
-        String varId = getVariableFromId(layerId);
+        String varId = getVariableIdFromLayerName(layerId);
         VariableMetadata variableMetadata = dataset.getVariableMetadata(varId);
-        Double surface = GISUtils.getClosestElevationToSurface(variableMetadata.getVerticalDomain());
+        Double surface = GISUtils
+                .getClosestElevationToSurface(variableMetadata.getVerticalDomain());
         Collection<? extends PointSeriesFeature> timeseriesFeatures = dataset
-                .extractTimeseriesFeatures(CollectionUtils.setOf(varId), new PlottingDomainParams(1,
-                        1, null, null, null, new HorizontalPosition(position.longitude.degrees,
-                                position.latitude.degrees, DefaultGeographicCRS.WGS84), surface, null));
+                .extractTimeseriesFeatures(CollectionUtils.setOf(varId), new PlottingDomainParams(
+                        1, 1, null, null, null, new HorizontalPosition(position.longitude.degrees,
+                                position.latitude.degrees, DefaultGeographicCRS.WGS84), surface,
+                        null));
         return timeseriesFeatures;
     }
 
@@ -178,7 +227,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
      */
     public VariableMetadata getVariableMetadataForLayer(String layerName) throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerName);
-        String variableFromId = getVariableFromId(layerName);
+        String variableFromId = getVariableIdFromLayerName(layerName);
         if (dataset != null && variableFromId != null) {
             return dataset.getVariableMetadata(variableFromId);
         } else {
@@ -230,7 +279,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         return datasets.get(layerParts[0]);
     }
 
-    private String getVariableFromId(String layerName) throws WmsLayerNotFoundException {
+    public String getVariableIdFromLayerName(String layerName) throws WmsLayerNotFoundException {
         String[] layerParts = layerName.split("/");
         if (layerParts.length != 2) {
             throw new WmsLayerNotFoundException(
