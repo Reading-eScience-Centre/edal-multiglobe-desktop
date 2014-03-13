@@ -39,9 +39,11 @@ import gov.nasa.worldwind.layers.AnnotationLayer;
 import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.jfree.chart.ChartUtilities;
@@ -61,6 +63,8 @@ import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.position.VerticalCrs;
 import uk.ac.rdg.resc.edal.util.GISUtils;
+import uk.ac.rdg.resc.edal.util.TimeUtils;
+import uk.ac.rdg.resc.old.EdalDataLayer;
 
 public class RescModel extends BasicModel implements SliderWidgetHandler {
     private final static String ELEVATION_SLIDER = "depth-slider";
@@ -73,15 +77,16 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     private VideoWallCatalogue catalogue;
     private boolean flat = false;
 
-    //    private EdalFeatureLayer featureLayer = null;
-
-    private EdalDataLayer currentDataLayer = null;
-    private VariableMetadata currentMetadata = null;
+    //    private EdalDataLayer currentDataLayer = null;
+    private EdalGridDataLayer gridDataLayer = null;
     private String edalLayerName = null;
+
+    private VariableMetadata currentMetadata = null;
 
     private EdalConfigLayer edalConfigLayer;
 
     private SliderWidgetAnnotation elevationSlider;
+    private String elevationUnits = "";
     private SliderWidgetAnnotation timeSlider;
 
     private AnnotationLayer annotationLayer;
@@ -115,6 +120,19 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         timeSlider = new SliderWidgetAnnotation(TIME_SLIDER, AVKey.HORIZONTAL, AVKey.SOUTH, 0,
                 1000, wwd, this);
 
+//        SliderWidgetAnnotation westSlider = new SliderWidgetAnnotation("test", AVKey.VERTICAL,
+//                AVKey.WEST, 0, 100, wwd, this);
+//        SliderWidgetAnnotation eastSlider = new SliderWidgetAnnotation("test", AVKey.VERTICAL,
+//                AVKey.EAST, 0, 100, wwd, this);
+//        SliderWidgetAnnotation northSlider = new SliderWidgetAnnotation("test", AVKey.HORIZONTAL,
+//                AVKey.NORTH, 0, 100, wwd, this);
+//        SliderWidgetAnnotation southSlider = new SliderWidgetAnnotation("test", AVKey.HORIZONTAL,
+//                AVKey.SOUTH, 0, 100, wwd, this);
+//        annotationLayer.addAnnotation(southSlider);
+//        annotationLayer.addAnnotation(northSlider);
+//        annotationLayer.addAnnotation(eastSlider);
+//        annotationLayer.addAnnotation(westSlider);
+
         //        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
         //        viewControlsLayer.setShowPitchControls(false);
         //        viewControlsLayer.setShowVeControls(false);
@@ -136,11 +154,22 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     public void setDataLayer(String layerName) {
-        //        featureLayer = new EdalFeatureLayer(layerName, catalogue);
-        //        getLayers().add(featureLayer);
-        boolean newLayer = false;
         if (layerName != null && !layerName.equals(edalLayerName)) {
-            newLayer = true;
+            /*
+             * Remove all annotations. This will get rid of the time and
+             * elevation sliders (new ones get put back if required), and also
+             * any feature info balloons
+             */
+            annotationLayer.removeAllAnnotations();
+
+            if (gridDataLayer != null) {
+                /*
+                 * Destroy the previous layer. This will remove all data layers
+                 * from the layer list
+                 */
+                gridDataLayer.destroy();
+            }
+            gridDataLayer = new EdalGridDataLayer(layerName, catalogue, getLayers(), wwd);
 
             /*
              * We have changed the layer. We want to pick a default datetime and
@@ -161,9 +190,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              * Remove the elevation/time sliders. We will add them again if
              * required.
              */
-            annotationLayer.removeAnnotation(elevationSlider);
             elevation = null;
-            annotationLayer.removeAnnotation(timeSlider);
             time = null;
 
             VerticalDomain verticalDomain = currentMetadata.getVerticalDomain();
@@ -178,6 +205,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                         elevationSlider.setReversed(false);
                     } else {
                         elevationSlider.setReversed(true);
+                    }
+                    if(verticalCrs.getUnits() != null) {
+                        elevationUnits = verticalCrs.getUnits();
                     }
                 }
                 /*
@@ -238,14 +268,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
         }
         edalLayerName = layerName;
-        drawLayer();
-
-        if (newLayer) {
-            EdalDataLayer.premptivelyCacheLayer(layerName, elevation, time, catalogue);
-        }
-        /*
-         * TODO Add time, elevation, etc to method signature
-         */
     }
 
     private void setTime(DateTime time) {
@@ -263,7 +285,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         } else {
             this.time = time;
         }
-        //        featureLayer.setTime(time);
+        gridDataLayer.setTime(time);
     }
 
     private void setElevation(double depth) {
@@ -278,28 +300,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         } else {
             this.elevation = depth;
         }
-        //        featureLayer.setElevation(elevation);
-    }
-
-    private void drawLayer() {
-        if (currentDataLayer != null) {
-            getLayers().remove(currentDataLayer);
-        }
-        if (edalLayerName == null) {
-            currentDataLayer = null;
-        } else {
-            /*
-             * TODO layerId needs to be (e.g.) a UUID which encapsulates date,
-             * time, elevation, layername, colourmap, etc. for caching
-             */
-            currentDataLayer = new EdalDataLayer(edalLayerName, catalogue, elevation, time);
-            getLayers().add(currentDataLayer);
-
-            //            featureLayer.setElevation(elevation);
-            //            featureLayer.setTime(time);
-            //            analytic = new EdalAnalyticSurfaceLayer(edalLayerName, catalogue, elevation, time);
-            //            getLayers().add(analytic);
-        }
+        gridDataLayer.setElevation(elevation);
     }
 
     public void showFeatureInfo(final Position position) {
@@ -458,16 +459,14 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         }).start();
     }
 
-    private Thread sliderTimer = null;
+    
 
     @Override
     public void sliderChanged(String id, double value) {
-        resetSliderTimer();
         switch (id) {
         case ELEVATION_SLIDER:
             for (RescModel model : elevationLinkedModels) {
                 model.setElevation(value);
-                model.drawLayer();
                 if (model != this) {
                     model.elevationSlider.setSliderValue(value);
                 }
@@ -476,7 +475,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         case TIME_SLIDER:
             for (RescModel model : timeLinkedModels) {
                 model.setTime(new DateTime((long) value));
-                model.drawLayer();
                 if (model != this) {
                     model.timeSlider.setSliderValue(value);
                 }
@@ -485,33 +483,24 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         default:
             break;
         }
-        sliderTimer.start();
     }
 
-    private void resetSliderTimer() {
-        if (sliderTimer != null) {
-            sliderTimer.interrupt();
+    private static final DecimalFormat NUMBER_3DP = new DecimalFormat("#0.000");
+    
+    @Override
+    public String formatSliderValue(String id, double value) {
+        switch (id) {
+        case ELEVATION_SLIDER:
+            return NUMBER_3DP.format(value) + " "+elevationUnits;
+        case TIME_SLIDER:
+            return TimeUtils.formatUtcHumanReadableDateTime(new DateTime((long) value));
+        default:
+            return "";
         }
-        sliderTimer = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                /*
-                 * Sleep for 1 second and then call the sliderSettled method
-                 */
-                try {
-                    Thread.sleep(500L);
-                    sliderSettled();
-                } catch (InterruptedException e) {
-                    /*
-                     * Don't do anything - the timer was interrupted
-                     * deliberately
-                     */
-                }
-            }
-        });
     }
 
-    private void sliderSettled() {
+    @Override
+    public void sliderSettled() {
         /*
          * TODO go and cache all of the times at this elevation and all of the
          * elevations at this time.
@@ -520,7 +509,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
          * used gets cached when required
          */
         //        System.out.println("Slider stopped moving for 500ms");
-
-        EdalDataLayer.premptivelyCacheLayer(edalLayerName, elevation, time, catalogue);
+        if (edalLayerName != null) {
+            EdalDataLayer.premptivelyCacheLayer(edalLayerName, elevation, time, catalogue);
+        }
     }
 }

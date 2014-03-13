@@ -106,18 +106,21 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
                     .getMapFeatureType(variable.getId());
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
-                try {
-                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
-                    gridFeatures.put(layerName, gridFeature);
-                } catch (DataReadingException e) {
-                    /*
-                     * TODO log this properly, and ignore can't read data, but
-                     * maybe it will work later...
-                     * 
-                     * Or just make this layer unavailable...
-                     */
-                    e.printStackTrace();
-                }
+                /*
+                 * This precaches features in memory.  Speeds up operation, but slows loading
+                 */
+//                try {
+//                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
+//                    gridFeatures.put(layerName, gridFeature);
+//                } catch (DataReadingException e) {
+//                    /*
+//                     * TODO log this properly, and ignore can't read data, but
+//                     * maybe it will work later...
+//                     * 
+//                     * Or just make this layer unavailable...
+//                     */
+//                    e.printStackTrace();
+//                }
             } else {
                 /*
                  * Not a grid feature. For now we ignore it and retrieve as

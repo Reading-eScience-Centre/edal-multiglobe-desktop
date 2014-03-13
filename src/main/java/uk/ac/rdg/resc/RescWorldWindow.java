@@ -36,7 +36,6 @@ import java.awt.event.MouseListener;
 
 @SuppressWarnings("serial")
 public class RescWorldWindow extends WorldWindowGLCanvas {
-
     private final LinkedView linkedView;
 
     public RescWorldWindow(LinkedView linkedView) {

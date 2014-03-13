@@ -35,14 +35,14 @@ import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.geometry.BoundingBox;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
-import uk.ac.rdg.resc.edal.graphics.style.ColourMap;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.MapImage;
-import uk.ac.rdg.resc.edal.graphics.style.PaletteColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.RasterLayer;
+import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
+import uk.ac.rdg.resc.old.EdalDataLayer;
 
 /**
  * This is a layer which displays EDAL data and can change data.
@@ -132,9 +132,9 @@ public class SingleEdalDataLayer extends BasicTiledImageLayer implements SelectL
         /*
          * TODO use XML styles...
          */
-        ColourScheme colourScheme = new PaletteColourScheme(new ColourScale(scaleRange.getLow(),
-                scaleRange.getHigh(), false), new ColourMap(Color.black, Color.black, new Color(0,
-                true), "rainbow", 100));
+        ColourScheme colourScheme = new SegmentColourScheme(new ColourScale(scaleRange.getLow(),
+                scaleRange.getHigh(), false), Color.black, Color.black, new Color(0, true),
+                "rainbow", 100);
         RasterLayer rasterLayer = new RasterLayer(layerName, colourScheme);
         mapImage = new MapImage();
         mapImage.getLayers().add(rasterLayer);

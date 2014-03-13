@@ -31,7 +31,7 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.render.Annotation;
 import gov.nasa.worldwind.render.AnnotationAttributes;
-import gov.nasa.worldwind.render.AnnotationFlowLayout;
+import gov.nasa.worldwind.render.AnnotationNullLayout;
 import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.render.ScreenAnnotation;
 
@@ -51,24 +51,31 @@ import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
  */
 public class SliderWidgetAnnotation extends ScreenAnnotation {
 
-    private static final int EDGE_DISTANCE_PX = 50;
+    private static final int EDGE_DISTANCE_PX = 60;
     private static final int SLIDER_WIDTH = 20;
 
+    private final ScreenAnnotation label;
     private final SliderWidget sliderWidget;
     private final String orientation;
     private String position;
 
     public SliderWidgetAnnotation(String id, String orientation, String position, double min,
-            double max, RescWorldWindow wwd, final SliderWidgetHandler handler) {//, AnnotationLayer parentLayer) {
+            double max, final RescWorldWindow wwd, final SliderWidgetHandler handler) {
         super("", new Point());
 
-        this.orientation = orientation;
+        if(orientation.equals(AVKey.VERTICAL)) {
+            this.orientation = orientation;
+        } else {
+            this.orientation = AVKey.HORIZONTAL;
+        }
         this.position = position;
 
         AnnotationAttributes attributes = new AnnotationAttributes();
         setupDefaultAttributes(attributes);
         getAttributes().setDefaults(attributes);
 
+        setLayout(new AnnotationNullLayout());
+        
         sliderWidget = new SliderWidget(id, orientation, min, min, max, new SliderWidgetHandler() {
             @Override
             public void sliderChanged(String id, double value) {
@@ -76,13 +83,43 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
                  * Update the value label, then pass the change event onto other
                  * listeners
                  */
-                //                System.out.println("Updating value");
-                handler.sliderChanged(id, value);
+                label.setText(formatSliderValue(id, value));
+                label.getAttributes().setVisible(true);
+                if (handler != null) {
+                    handler.sliderChanged(id, value);
+                }
+            }
+
+            @Override
+            public String formatSliderValue(String id, double value) {
+                if (handler != null) {
+                    return handler.formatSliderValue(id, value);
+                }
+                return "";
+            }
+
+            @Override
+            public void sliderSettled() {
+//                removeChild(label);
+                label.getAttributes().setVisible(false);
+                if(handler != null) {
+                    handler.sliderSettled();
+                }
+                wwd.redraw();
             }
         }, wwd);
-
-        setLayout(new AnnotationFlowLayout(orientation, AVKey.CENTER, 0, 0)); // hgap, vgap
+        
         addChild(sliderWidget);
+        
+        label = new ScreenAnnotation("", new Point());
+        AnnotationAttributes labelAttrs = label.getAttributes();
+        labelAttrs.setAdjustWidthToText(AVKey.SIZE_FIT_TEXT);
+        labelAttrs.setBackgroundColor(Color.black);
+        labelAttrs.setTextColor(Color.lightGray);
+        labelAttrs.setTextAlign(AVKey.CENTER);
+        
+        addChild(label);
+        label.getAttributes().setVisible(false);
     }
 
     public boolean equalLimits(SliderWidgetAnnotation other) {
@@ -110,40 +147,52 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
     @Override
     protected void doRenderNow(DrawContext dc) {
         /*
-         * TODO use the viewport and the position to place and scale this
+         * Position the slider and label relative to the viewport
          */
         Rectangle viewport = dc.getView().getViewport();
-        Dimension size = sliderWidget.getAttributes().getSize();
+        Dimension labelSize = label.getPreferredSize(dc);
 
         if (orientation.equals(AVKey.HORIZONTAL)) {
             sliderWidget.getAttributes().setSize(
                     new Dimension(viewport.width * 1 / 2, SLIDER_WIDTH));
+            Dimension sliderSize = sliderWidget.getAttributes().getSize();
+            getAttributes().setDrawOffset(new Point(0, -SLIDER_WIDTH / 2));
+            label.getAttributes().setDrawOffset(
+                    new Point((sliderSize.width - labelSize.width) / 2,
+                            (sliderSize.height - labelSize.height) / 2));
             if (position.equals(AVKey.SOUTH)) {
                 setScreenPoint(new Point(viewport.x + viewport.width / 2, EDGE_DISTANCE_PX));
             } else if (position.equals(AVKey.NORTH)) {
                 setScreenPoint(new Point(viewport.x + viewport.width / 2, viewport.y
                         + viewport.height - EDGE_DISTANCE_PX));
             } else if (position.equals(AVKey.WEST)) {
-                setScreenPoint(new Point(viewport.x + EDGE_DISTANCE_PX + size.width / 2
+                setScreenPoint(new Point(viewport.x + EDGE_DISTANCE_PX + sliderSize.width / 2
                         - SLIDER_WIDTH / 2, viewport.y + viewport.height / 2));
             } else if (position.equals(AVKey.EAST)) {
                 setScreenPoint(new Point(viewport.x + viewport.width - EDGE_DISTANCE_PX
-                        - size.width / 2 + SLIDER_WIDTH / 2, viewport.y + viewport.height / 2));
+                        - sliderSize.width / 2 + SLIDER_WIDTH / 2, viewport.y + viewport.height / 2));
             }
         } else {
             sliderWidget.getAttributes().setSize(
                     new Dimension(SLIDER_WIDTH, viewport.height * 1 / 2));
+            Dimension sliderSize = sliderWidget.getAttributes().getSize();
+            
+            int labelOffset = (int) ((label.getPreferredSize(dc).width )/ 2);
+            label.getAttributes().setDrawOffset(
+                    new Point(sliderSize.width/ 2 - labelOffset,
+                            (sliderSize.height - labelSize.height) / 2));
+            getAttributes().setDrawOffset(new Point(labelOffset , -sliderSize.height/2));
             if (position.equals(AVKey.SOUTH)) {
                 setScreenPoint(new Point(viewport.x + viewport.width / 2, EDGE_DISTANCE_PX));
             } else if (position.equals(AVKey.NORTH)) {
                 setScreenPoint(new Point(viewport.x + viewport.width / 2, viewport.y
-                        + viewport.height - EDGE_DISTANCE_PX - size.height + SLIDER_WIDTH));
+                        + viewport.height - EDGE_DISTANCE_PX - sliderSize.height + SLIDER_WIDTH));
             } else if (position.equals(AVKey.WEST)) {
                 setScreenPoint(new Point(viewport.x + EDGE_DISTANCE_PX, viewport.y
-                        + viewport.height / 2 - size.height / 2));
+                        + viewport.height / 2));
             } else if (position.equals(AVKey.EAST)) {
                 setScreenPoint(new Point(viewport.x + viewport.width - EDGE_DISTANCE_PX, viewport.y
-                        + viewport.height / 2 - size.height / 2));
+                        + viewport.height / 2));
             }
         }
 

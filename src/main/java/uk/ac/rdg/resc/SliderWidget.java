@@ -67,17 +67,19 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     protected double min;
     protected double max;
     protected Color backgroundColor;
-    private Color highlightColor;
     protected Color elementColor;
     protected Insets interiorInsets;
 
     //    private boolean highlighted = false;
+//    private Color highlightColor;
 
     private String orientation;
     private SliderWidgetHandler handler;
     private Point lastDragPoint = null;
-
+    
     private DoubleBuffer circleElementBuffer;
+    
+    private Thread sliderTimer = null;
 
     public SliderWidget(String id, String orientation, double value, double min, double max,
             SliderWidgetHandler handler, WorldWindow wwd) {
@@ -98,7 +100,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         this.handler = handler;
 
         this.backgroundColor = new Color(60, 60, 60, 128);
-        this.highlightColor = new Color(120, 120, 120, 196);
+//        this.highlightColor = new Color(120, 120, 120, 196);
         this.elementColor = new Color(171, 171, 171, 196);
         this.interiorInsets = new Insets(2, 2, 2, 2);
 
@@ -134,7 +136,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     public void setReversed(boolean reversed) {
         this.reversed = reversed;
     }
-    
+
     public double getValue() {
         return value;
     }
@@ -260,8 +262,8 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
 
     protected int computeSliderRelativePos(int barSize) {
         double factor = (value - min) / (max - min);
-        if(reversed) {
-            return (int) ((1.0-factor) * barSize);
+        if (reversed) {
+            return (int) ((1.0 - factor) * barSize);
         } else {
             return (int) (factor * barSize);
         }
@@ -287,9 +289,9 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                         percMove = diff / (double) getAttributes().getSize().height;
                     }
                     double valueDiff = percMove * (max - min);
-                    
+
                     double value;
-                    if(reversed){
+                    if (reversed) {
                         value = getValue() - valueDiff;
                     } else {
                         value = getValue() + valueDiff;
@@ -297,23 +299,67 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                     lastDragPoint = point;
                     setValue(value);
                     if (handler != null) {
+                        resetSliderTimer();
                         handler.sliderChanged(id, getValue());
+                        sliderTimer.start();
                     }
                     event.getMouseEvent().consume();
                 }
             }
         }
     }
+    
+    private void resetSliderTimer() {
+        if (sliderTimer != null) {
+            sliderTimer.interrupt();
+        }
+        sliderTimer = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                /*
+                 * Sleep for 1 second and then call the sliderSettled method
+                 */
+                try {
+                    Thread.sleep(500L);
+                    if(handler != null) {
+                        handler.sliderSettled();
+                    }
+                } catch (InterruptedException e) {
+                    /*
+                     * Don't do anything - the timer was interrupted
+                     * deliberately
+                     */
+                }
+            }
+        });
+    }
+
 
     public interface SliderWidgetHandler {
         /**
          * Gets called when the value of the slider changes
          * 
          * @param id
-         *            The ID of the element which fired this event
+         *            The ID of the slider which has changed
          * @param value
          *            The double value which the slider has changed to
          */
         public void sliderChanged(String id, double value);
+
+        /**
+         * Formats a slider value as text
+         * 
+         * @param id
+         *            The ID of the slider
+         * @param value
+         *            The value to format
+         * @return A formatted string representing the slider's value
+         */
+        public String formatSliderValue(String id, double value);
+        
+        /**
+         * Called once a slider has stopped moving for 500ms
+         */
+        public void sliderSettled();
     }
 }

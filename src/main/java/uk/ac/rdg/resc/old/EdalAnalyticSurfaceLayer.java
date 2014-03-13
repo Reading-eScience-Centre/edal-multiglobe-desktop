@@ -4,7 +4,7 @@ as represented by the Administrator of the
 National Aeronautics and Space Administration.
 All Rights Reserved.
  */
-package uk.ac.rdg.resc;
+package uk.ac.rdg.resc.old;
 
 import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.avlist.AVKey;
@@ -25,6 +25,7 @@ import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
 import org.joda.time.chrono.ISOChronology;
 
+import uk.ac.rdg.resc.VideoWallCatalogue;
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.domain.HorizontalDomain;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
@@ -32,10 +33,9 @@ import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
 import uk.ac.rdg.resc.edal.feature.MapFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBox;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
-import uk.ac.rdg.resc.edal.graphics.style.ColourMap;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
-import uk.ac.rdg.resc.edal.graphics.style.PaletteColourScheme;
+import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue.FeaturesAndMemberName;
 import uk.ac.rdg.resc.edal.grid.HorizontalGrid;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
@@ -134,9 +134,9 @@ public class EdalAnalyticSurfaceLayer extends RenderableLayer implements SelectL
                 PlottingDomainParams params = new PlottingDomainParams(width, height,
                         bboxGlobal, null, null, null, elevation, time);
                 FeaturesAndMemberName features = catalogue.getFeaturesForLayer(layerName, params);
-                ColourScheme colourScheme = new PaletteColourScheme(new ColourScale(
-                        scaleRange.getLow(), scaleRange.getHigh(), false), new ColourMap(
-                        Color.black, Color.black, new Color(0, true), "rainbow", 100));
+                ColourScheme colourScheme = new SegmentColourScheme(new ColourScale(
+                        scaleRange.getLow(), scaleRange.getHigh(), false), Color.black, Color.black,
+                        new Color(0, true), "rainbow", 100);
                 
                 surface.setSector(Sector.fromDegrees(-89.5, 89.5, -179.5, 179.5));
 

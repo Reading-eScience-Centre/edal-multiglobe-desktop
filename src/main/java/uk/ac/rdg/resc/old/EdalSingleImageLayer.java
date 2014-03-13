@@ -4,55 +4,31 @@ as represented by the Administrator of the
 National Aeronautics and Space Administration.
 All Rights Reserved.
  */
-package uk.ac.rdg.resc;
+package uk.ac.rdg.resc.old;
 
-import gov.nasa.worldwind.WorldWind;
-import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.avlist.AVList;
-import gov.nasa.worldwind.avlist.AVListImpl;
 import gov.nasa.worldwind.event.SelectEvent;
 import gov.nasa.worldwind.event.SelectListener;
-import gov.nasa.worldwind.geom.Angle;
-import gov.nasa.worldwind.geom.LatLon;
 import gov.nasa.worldwind.geom.Sector;
-import gov.nasa.worldwind.layers.BasicTiledImageLayer;
 import gov.nasa.worldwind.layers.RenderableLayer;
-import gov.nasa.worldwind.layers.TextureTile;
 import gov.nasa.worldwind.render.SurfaceImage;
-import gov.nasa.worldwind.util.LevelSet;
 
 import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
-import javax.imageio.ImageIO;
-
-import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
 
+import uk.ac.rdg.resc.VideoWallCatalogue;
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.domain.HorizontalDomain;
-import uk.ac.rdg.resc.edal.domain.TemporalDomain;
-import uk.ac.rdg.resc.edal.domain.VerticalDomain;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.geometry.BoundingBox;
-import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
-import uk.ac.rdg.resc.edal.graphics.style.ColourMap;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.MapImage;
-import uk.ac.rdg.resc.edal.graphics.style.PaletteColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.RasterLayer;
+import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.grid.HorizontalGrid;
-import uk.ac.rdg.resc.edal.grid.TimeAxis;
-import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
-import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
 
 /**
@@ -122,9 +98,9 @@ public class EdalSingleImageLayer extends RenderableLayer implements SelectListe
             /*
              * TODO use XML styles...
              */
-            ColourScheme colourScheme = new PaletteColourScheme(new ColourScale(scaleRange.getLow(),
-                    scaleRange.getHigh(), false), new ColourMap(Color.black, Color.black, new Color(0,
-                            true), "rainbow", 100));
+            ColourScheme colourScheme = new SegmentColourScheme(new ColourScale(
+                    scaleRange.getLow(), scaleRange.getHigh(), false), Color.black, Color.black,
+                    new Color(0, true), "rainbow", 100);
             RasterLayer rasterLayer = new RasterLayer(layerName, colourScheme);
             mapImage = new MapImage();
             mapImage.getLayers().add(rasterLayer);

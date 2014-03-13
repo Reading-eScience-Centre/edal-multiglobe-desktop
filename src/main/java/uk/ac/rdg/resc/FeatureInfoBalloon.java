@@ -38,6 +38,7 @@ import gov.nasa.worldwind.render.Annotation;
 import gov.nasa.worldwind.render.AnnotationAttributes;
 import gov.nasa.worldwind.render.AnnotationFlowLayout;
 import gov.nasa.worldwind.render.AnnotationNullLayout;
+import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.render.ScreenAnnotation;
 import gov.nasa.worldwindx.examples.util.ButtonAnnotation;
 import gov.nasa.worldwindx.examples.util.DialogAnnotation;
@@ -98,7 +99,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
 
         busyImage = new BusyImage(BUSY_IMAGE_PATH);
     }
-
+    
     protected void initFeatureInfoComponents() {
         closeFullScreen = new ButtonAnnotation(RESC_CLOSE_IMAGE_PATH, DEPRESSED_MASK_PATH);
 

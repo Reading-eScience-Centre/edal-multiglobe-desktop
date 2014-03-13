@@ -4,10 +4,8 @@ as represented by the Administrator of the
 National Aeronautics and Space Administration.
 All Rights Reserved.
  */
-package uk.ac.rdg.resc;
+package uk.ac.rdg.resc.old;
 
-import gov.nasa.worldwind.Configuration;
-import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.avlist.AVList;
 import gov.nasa.worldwind.avlist.AVListImpl;
@@ -16,43 +14,29 @@ import gov.nasa.worldwind.event.SelectListener;
 import gov.nasa.worldwind.geom.Angle;
 import gov.nasa.worldwind.geom.LatLon;
 import gov.nasa.worldwind.geom.Sector;
-import gov.nasa.worldwind.layers.BasicTiledImageLayer;
 import gov.nasa.worldwind.layers.TextureTile;
 import gov.nasa.worldwind.util.LevelSet;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-
-import javax.imageio.ImageIO;
 
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
 
+import uk.ac.rdg.resc.OnTheFlyTiledImageLayer;
+import uk.ac.rdg.resc.VideoWallCatalogue;
 import uk.ac.rdg.resc.edal.domain.Extent;
-import uk.ac.rdg.resc.edal.exceptions.DataReadingException;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
-import uk.ac.rdg.resc.edal.feature.GridFeature;
-import uk.ac.rdg.resc.edal.feature.MapFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBox;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
-import uk.ac.rdg.resc.edal.graphics.style.ColourMap;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.MapImage;
-import uk.ac.rdg.resc.edal.graphics.style.PaletteColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.RasterLayer;
-import uk.ac.rdg.resc.edal.grid.HorizontalGrid;
-import uk.ac.rdg.resc.edal.grid.RegularGridImpl;
+import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
-import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
-
-import com.jogamp.opengl.util.texture.TextureData;
-import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 
 /**
  * Procedural layer example
@@ -134,9 +118,9 @@ public class EdalFeatureLayer extends OnTheFlyTiledImageLayer implements SelectL
         /*
          * TODO use XML styles...
          */
-        ColourScheme colourScheme = new PaletteColourScheme(new ColourScale(scaleRange.getLow(),
-                scaleRange.getHigh(), false), new ColourMap(Color.black, Color.black, new Color(0,
-                true), "rainbow", 100));
+        ColourScheme colourScheme = new SegmentColourScheme(new ColourScale(
+                scaleRange.getLow(), scaleRange.getHigh(), false), Color.black, Color.black,
+                new Color(0, true), "rainbow", 100);
         RasterLayer raster = new RasterLayer(layerName, colourScheme);
 
         mapImage = new MapImage();
