@@ -60,7 +60,7 @@ import javax.media.opengl.GL2;
 public class SliderWidget extends ScreenAnnotation implements SelectListener {
     private static final int CIRCLE_SIZE = 22;
 
-    private final String id;
+    final String id;
 
     private boolean reversed = false;
     protected double value;
@@ -74,7 +74,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
 //    private Color highlightColor;
 
     private String orientation;
-    private SliderWidgetHandler handler;
+    SliderWidgetHandler handler;
     private Point lastDragPoint = null;
     
     private DoubleBuffer circleElementBuffer;
@@ -300,7 +300,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                     setValue(value);
                     if (handler != null) {
                         resetSliderTimer();
-                        handler.sliderChanged(id, getValue());
+                        handler.sliderChanged(id, this.value);
                         sliderTimer.start();
                     }
                     event.getMouseEvent().consume();

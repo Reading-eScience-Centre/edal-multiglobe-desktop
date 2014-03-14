@@ -88,39 +88,31 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         rootMenuNode = new ActiveLayerMenuItem("Root", "root", false, false);
     }
 
-    public GridFeature getGridFeature(String layerName) throws WmsLayerNotFoundException {
-        if (gridFeatures.containsKey(layerName)) {
-            return gridFeatures.get(layerName);
-        } else {
-            throw new WmsLayerNotFoundException("No grid feature available for layer " + layerName);
-        }
-    }
-
     @Override
     public void datasetLoaded(Dataset dataset, Collection<NcwmsVariable> variables) {
         datasets.put(dataset.getId(), dataset);
         for (NcwmsVariable variable : variables) {
             String layerName = getLayerName(dataset.getId(), variable.getId());
             this.variables.put(layerName, variable);
-
+            
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
                     .getMapFeatureType(variable.getId());
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
                 /*
-                 * This precaches features in memory.  Speeds up operation, but slows loading
+                 * This preloads features in memory.  Speeds up operation, but slows loading
                  */
-//                try {
-//                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
-//                    gridFeatures.put(layerName, gridFeature);
-//                } catch (DataReadingException e) {
-//                    /*
-//                     * TODO log this properly, and ignore can't read data, but
-//                     * maybe it will work later...
-//                     * 
-//                     * Or just make this layer unavailable...
-//                     */
-//                    e.printStackTrace();
-//                }
+                try {
+                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
+                    gridFeatures.put(layerName, gridFeature);
+                } catch (DataReadingException e) {
+                    /*
+                     * TODO log this properly, and ignore can't read data, but
+                     * maybe it will work later...
+                     * 
+                     * Or just make this layer unavailable...
+                     */
+                    e.printStackTrace();
+                }
             } else {
                 /*
                  * Not a grid feature. For now we ignore it and retrieve as
@@ -157,14 +149,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
     public Number getLayerValue(String layerId, Position position, Double z, DateTime time)
             throws EdalException {
         /*
-         * Massive hack for proof-of-concept.
-         * 
-         * Make it work properly (maybe we want a readSinglePoint method on the
-         * dataset?). Also, document Dataset!
-         * 
-         * The previous version of this (also a massive hack) didn't work
-         * because of issues with readFeature for grids where an axis is
-         * missing...
+         * Bit of a hack for proof-of-concept.
          */
         Dataset dataset = getDatasetFromLayerName(layerId);
         String varId = getVariableIdFromLayerName(layerId);
@@ -177,14 +162,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         DiscreteFeature<?, ?> feature = mapFeatures.iterator().next();
         if (feature instanceof MapFeature) {
             MapFeature mapFeature = (MapFeature) feature;
-            /*
-             * This should correspond to the ll corner of the bbox, so that's
-             * right
-             * 
-             * But yeah, massive hack
-             */
             return mapFeature.getValues(varId).get(0, 0);
-
         } else {
             return null;
         }

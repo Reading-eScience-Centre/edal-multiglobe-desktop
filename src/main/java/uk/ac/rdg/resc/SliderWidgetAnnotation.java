@@ -100,7 +100,6 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
 
             @Override
             public void sliderSettled() {
-//                removeChild(label);
                 label.getAttributes().setVisible(false);
                 if(handler != null) {
                     handler.sliderSettled();

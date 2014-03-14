@@ -75,8 +75,8 @@
     <Property name="gov.nasa.worldwind.avkey.TextureCacheSize" value="5000000000"/>
     <Property name="gov.nasa.worldwind.avkey.ElevationTileCacheSize" value="10000000"/>
     <Property name="gov.nasa.worldwind.avkey.SectorGeometryCacheSize" value="10000000"/>
-    <!-- This is a 2G in-memory cache -->
-    <Property name="gov.nasa.worldwind.avkey.TextureTileCacheSize" value="2000000000"/>
+    <!-- This is a 4G in-memory cache -->
+    <Property name="gov.nasa.worldwind.avkey.TextureTileCacheSize" value="4000000000"/>
     <Property name="gov.nasa.worldwind.avkey.PlacenameLayerCacheSize" value="4000000"/>
     <Property name="gov.nasa.worldwind.avkey.AirspaceGeometryCacheSize" value="32000000"/>
     <Property name="gov.nasa.worldwind.avkey.VBOUsage" value="true"/>
