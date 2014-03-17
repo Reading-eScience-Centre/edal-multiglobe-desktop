@@ -109,6 +109,10 @@ public class MultiGlobeFrame extends JPanel {
             panels.add(wwd);
             add(wwd);
         }
+        
+        for(RescWorldWindow panel : panels) {
+            panel.redraw();
+        }
         this.validate();
     }
 

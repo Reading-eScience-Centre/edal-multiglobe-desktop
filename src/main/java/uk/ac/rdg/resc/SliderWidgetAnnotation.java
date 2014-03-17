@@ -40,6 +40,8 @@ import java.awt.Dimension;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.HashSet;
+import java.util.Set;
 
 import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
 
@@ -58,6 +60,10 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
     private final SliderWidget sliderWidget;
     private final String orientation;
     private String position;
+    private final SliderWidgetHandler handler;
+    private final RescWorldWindow wwd;
+    
+    private final Set<SliderWidgetAnnotation> linkedSliders = new HashSet<>();
 
     public SliderWidgetAnnotation(String id, String orientation, String position, double min,
             double max, final RescWorldWindow wwd, final SliderWidgetHandler handler) {
@@ -76,6 +82,9 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
 
         setLayout(new AnnotationNullLayout());
         
+        this.handler = handler;
+        this.wwd = wwd;
+        
         sliderWidget = new SliderWidget(id, orientation, min, min, max, new SliderWidgetHandler() {
             @Override
             public void sliderChanged(String id, double value) {
@@ -87,6 +96,14 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
                 label.getAttributes().setVisible(true);
                 if (handler != null) {
                     handler.sliderChanged(id, value);
+                }
+                for(SliderWidgetAnnotation linked : linkedSliders) {
+                    linked.sliderWidget.setValue(value);
+                    linked.label.setText(formatSliderValue(id, value));
+                    linked.label.getAttributes().setVisible(true);
+                    if (linked.handler != null) {
+                        linked.handler.sliderChanged(id, value);
+                    }
                 }
             }
 
@@ -101,10 +118,19 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
             @Override
             public void sliderSettled() {
                 label.getAttributes().setVisible(false);
+                wwd.redraw();
+                for(SliderWidgetAnnotation linked : linkedSliders) {
+                    linked.label.getAttributes().setVisible(false);
+                    linked.wwd.redraw();
+                }
                 if(handler != null) {
                     handler.sliderSettled();
                 }
-                wwd.redraw();
+                for(SliderWidgetAnnotation linked : linkedSliders) {
+                    if(linked.handler != null) {
+                        linked.handler.sliderSettled();
+                    }
+                }
             }
         }, wwd);
         
@@ -121,6 +147,11 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
         label.getAttributes().setVisible(false);
     }
 
+    public void linkSlider(SliderWidgetAnnotation other) {
+        linkedSliders.add(other);
+        other.linkedSliders.add(this);
+    }
+    
     public boolean equalLimits(SliderWidgetAnnotation other) {
         return other.sliderWidget.max == sliderWidget.max
                 && other.sliderWidget.min == sliderWidget.min;

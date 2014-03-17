@@ -150,6 +150,21 @@ public class EdalGridDataLayer {
         return metadata;
     }
 
+    public BufferedImage getLegend(int size) {
+        if (dataLayer != null) {
+            try {
+                return dataLayer.mapImage.getLegend(size, Color.lightGray, new Color(0, true),
+                        false, 20);
+            } catch (EdalException e) {
+                /*
+                 * TODO log properly
+                 */
+                e.printStackTrace();
+            }
+        }
+        return null;
+    }
+
     private void drawLayer() {
         if (dataLayer != null) {
             layerList.remove(dataLayer);
@@ -457,13 +472,13 @@ public class EdalGridDataLayer {
         private boolean stop = false;
         private DateTime time;
         private Double elevation;
-    
+
         public TimeCacher(final DateTime time, final Double elevation) {
             super();
             this.time = time;
             this.elevation = elevation;
         }
-    
+
         @Override
         public void run() {
             int timeIndex = tAxis.findIndexOf(time);
@@ -482,10 +497,10 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-//            System.out.println("cached times for layer: " + layerName + " at elevation "
-//                    + elevation);
+            //            System.out.println("cached times for layer: " + layerName + " at elevation "
+            //                    + elevation);
         }
-    
+
         public void stopCaching() {
             stop = true;
         }
@@ -495,13 +510,13 @@ public class EdalGridDataLayer {
         private boolean stop = false;
         private DateTime time;
         private Double elevation;
-    
+
         public ElevationCacher(final Double elevation, final DateTime time) {
             super();
             this.elevation = elevation;
             this.time = time;
         }
-    
+
         @Override
         public void run() {
             int zIndex = zAxis.findIndexOf(elevation);
@@ -520,10 +535,10 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-//            System.out.println("cached elevations for layer: " + layerName + " at time "
-//                    + time);
+            //            System.out.println("cached elevations for layer: " + layerName + " at time "
+            //                    + time);
         }
-    
+
         public void stopCaching() {
             stop = true;
         }

@@ -101,18 +101,18 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
                 /*
                  * This preloads features in memory.  Speeds up operation, but slows loading
                  */
-                try {
-                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
-                    gridFeatures.put(layerName, gridFeature);
-                } catch (DataReadingException e) {
-                    /*
-                     * TODO log this properly, and ignore can't read data, but
-                     * maybe it will work later...
-                     * 
-                     * Or just make this layer unavailable...
-                     */
-                    e.printStackTrace();
-                }
+//                try {
+//                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
+//                    gridFeatures.put(layerName, gridFeature);
+//                } catch (DataReadingException e) {
+//                    /*
+//                     * TODO log this properly, and ignore can't read data, but
+//                     * maybe it will work later...
+//                     * 
+//                     * Or just make this layer unavailable...
+//                     */
+//                    e.printStackTrace();
+//                }
             } else {
                 /*
                  * Not a grid feature. For now we ignore it and retrieve as

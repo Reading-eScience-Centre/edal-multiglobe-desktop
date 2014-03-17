@@ -35,8 +35,14 @@ import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
 import gov.nasa.worldwind.layers.AnnotationLayer;
+import gov.nasa.worldwind.layers.LayerList;
+import gov.nasa.worldwind.render.DrawContext;
+import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 import java.awt.Color;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -81,11 +87,18 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
     private EdalConfigLayer edalConfigLayer;
 
+    private AnnotationLayer annotationLayer;
     private SliderWidgetAnnotation elevationSlider;
     private String elevationUnits = "";
     private SliderWidgetAnnotation timeSlider;
+    private ImageAnnotation legendAnnotation = null;
 
-    private AnnotationLayer annotationLayer;
+    /*
+     * We store the viewport height so that if it changes we can re-generated
+     * the legend
+     */
+    private int lastViewportHeight = -1;
+
     private RescWorldWindow wwd;
 
     //    private Double elevation;
@@ -108,26 +121,28 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
         getLayers().add(edalConfigLayer);
 
-        annotationLayer = new AnnotationLayer();
+        annotationLayer = new AnnotationLayer() {
+            @Override
+            protected void doRender(DrawContext dc) {
+                super.doRender(dc);
+                if (gridDataLayer != null) {
+                    Rectangle viewport = dc.getView().getViewport();
+                    if (viewport.height != lastViewportHeight) {
+                        lastViewportHeight = viewport.height;
+                        addLegend(viewport.height / 2);
+                    }
+                    int width = ((BufferedImage) legendAnnotation.getImageSource()).getWidth();
+                    legendAnnotation.setScreenPoint(new Point(viewport.x + viewport.width - width,
+                            viewport.y + viewport.height / 4));
+                }
+            }
+        };
         getLayers().add(annotationLayer);
 
         elevationSlider = new SliderWidgetAnnotation(ELEVATION_SLIDER, AVKey.VERTICAL, AVKey.WEST,
                 100, 0, wwd, this);
         timeSlider = new SliderWidgetAnnotation(TIME_SLIDER, AVKey.HORIZONTAL, AVKey.SOUTH, 0,
                 1000, wwd, this);
-
-        //        SliderWidgetAnnotation westSlider = new SliderWidgetAnnotation("test", AVKey.VERTICAL,
-        //                AVKey.WEST, 0, 100, wwd, this);
-        //        SliderWidgetAnnotation eastSlider = new SliderWidgetAnnotation("test", AVKey.VERTICAL,
-        //                AVKey.EAST, 0, 100, wwd, this);
-        //        SliderWidgetAnnotation northSlider = new SliderWidgetAnnotation("test", AVKey.HORIZONTAL,
-        //                AVKey.NORTH, 0, 100, wwd, this);
-        //        SliderWidgetAnnotation southSlider = new SliderWidgetAnnotation("test", AVKey.HORIZONTAL,
-        //                AVKey.SOUTH, 0, 100, wwd, this);
-        //        annotationLayer.addAnnotation(southSlider);
-        //        annotationLayer.addAnnotation(northSlider);
-        //        annotationLayer.addAnnotation(eastSlider);
-        //        annotationLayer.addAnnotation(westSlider);
 
         //        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
         //        viewControlsLayer.setShowPitchControls(false);
@@ -213,20 +228,28 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                 elevationSlider.setLimits(verticalDomain.getExtent().getLow(), verticalDomain
                         .getExtent().getHigh());
                 elevationSlider.setSliderValue(gridDataLayer.getElevation());
-                
+
                 List<RescModel> allModels = parent.getAllModels();
                 elevationLinkedModels.clear();
                 for (RescModel model : allModels) {
-                    if (model.elevationSlider.equalLimits(elevationSlider)) {
-                        elevationLinkedModels.add(model);
-                        if (!model.elevationLinkedModels.contains(this)) {
-                            model.elevationLinkedModels.add(this);
-                        }
-                        if (model != this && model.gridDataLayer != null) {
+                    if (model != this && model.elevationSlider != null
+                            && model.elevationSlider.equalLimits(elevationSlider)) {
+                        elevationSlider.linkSlider(model.elevationSlider);
+                        if (model.gridDataLayer != null) {
                             elevationSlider.setSliderValue(model.elevationSlider.getSliderValue());
                             gridDataLayer.setElevation(model.elevationSlider.getSliderValue());
                         }
                     }
+                    //                    if (model.elevationSlider.equalLimits(elevationSlider)) {
+                    //                        elevationLinkedModels.add(model);
+                    //                        if (!model.elevationLinkedModels.contains(this)) {
+                    //                            model.elevationLinkedModels.add(this);
+                    //                        }
+                    //                        if (model != this && model.gridDataLayer != null) {
+                    //                            elevationSlider.setSliderValue(model.elevationSlider.getSliderValue());
+                    //                            gridDataLayer.setElevation(model.elevationSlider.getSliderValue());
+                    //                        }
+                    //                    }
                 }
 
                 /*
@@ -237,22 +260,21 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
             TimeAxis tAxis = layerMetadata.getTemporalDomain();
             if (tAxis != null) {
-                timeSlider.setLimits(tAxis.getExtent().getLow().getMillis(), tAxis
-                        .getExtent().getHigh().getMillis());
+                timeSlider.setLimits(tAxis.getExtent().getLow().getMillis(), tAxis.getExtent()
+                        .getHigh().getMillis());
                 timeSlider.setSliderValue(gridDataLayer.getTime().getMillis());
 
                 List<RescModel> allModels = parent.getAllModels();
                 timeLinkedModels.clear();
                 for (RescModel model : allModels) {
-                    if (model.timeSlider.equalLimits(timeSlider)) {
-                        timeLinkedModels.add(model);
-                        if (!model.timeLinkedModels.contains(this)) {
-                            model.timeLinkedModels.add(this);
+                    if (model != this && model.timeSlider != null
+                            && model.timeSlider.equalLimits(timeSlider)) {
+                        timeSlider.linkSlider(model.timeSlider);
+                        if (model.gridDataLayer != null) {
+                            timeSlider.setSliderValue(model.timeSlider.getSliderValue());
+                            gridDataLayer.setTime(new DateTime((long) model.timeSlider
+                                    .getSliderValue()));
                         }
-                    }
-                    if (model != this && model.gridDataLayer != null) {
-                        timeSlider.setSliderValue(model.timeSlider.getSliderValue());
-                        gridDataLayer.setTime(new DateTime((long) model.timeSlider.getSliderValue()));
                     }
                 }
                 /*
@@ -260,9 +282,19 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                  */
                 annotationLayer.addAnnotation(timeSlider);
             }
-
         }
         edalLayerName = layerName;
+    }
+
+    private void addLegend(int size) {
+        if (legendAnnotation != null) {
+            annotationLayer.removeAnnotation(legendAnnotation);
+        }
+        BufferedImage legend = gridDataLayer.getLegend(size);
+        if (legend != null) {
+            legendAnnotation = new ImageAnnotation(legend);
+            annotationLayer.addAnnotation(legendAnnotation);
+        }
     }
 
     public void showFeatureInfo(final Position position) {
@@ -425,19 +457,13 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     public void sliderChanged(String id, double value) {
         switch (id) {
         case ELEVATION_SLIDER:
-            for (RescModel model : elevationLinkedModels) {
-                model.gridDataLayer.setElevation(value);
-                if (model != this) {
-                    model.elevationSlider.setSliderValue(value);
-                }
+            if (gridDataLayer != null) {
+                gridDataLayer.setElevation(value);
             }
             break;
         case TIME_SLIDER:
-            for (RescModel model : timeLinkedModels) {
-                model.gridDataLayer.setTime(new DateTime((long) value));
-                if (model != this) {
-                    model.timeSlider.setSliderValue(value);
-                }
+            if (gridDataLayer != null) {
+                gridDataLayer.setTime(new DateTime((long) value));
             }
             break;
         default:
