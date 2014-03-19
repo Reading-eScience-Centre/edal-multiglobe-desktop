@@ -57,11 +57,19 @@ import uk.ac.rdg.resc.LinkedView.LinkedViewState;
  * @author Guy
  */
 public class EdalConfigLayer extends RenderableLayer implements SelectListener {
+    private final static String CONFIG_BUTTON = "images/config_button.png";
+    private final static String LAYERS_BUTTON = "images/layers_button.png";
+    private final static String LINK_BUTTON = "images/link_button.png";
+    private final static String UNLINK_BUTTON = "images/unlink_button.png";
+    private final static String ANTILINK_BUTTON = "images/antilink_button.png";
+    private final static String GLOBE_BUTTON = "images/flat_globe.png";
+    private final static String MAP_BUTTON = "images/flat_map.png";
+    
     protected RescWorldWindow wwd;
     protected boolean update = true;
     protected VideoWallCatalogue catalogue;
 
-    private ImageAnnotation configButton;
+    private ImageAnnotation layersButton;
     
     
     private ImageAnnotation linkStateButton;
@@ -76,7 +84,6 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
 
     protected Dimension layerSelectorSize;
     private Color color = Color.decode("#b0b0b0");
-//    private Color highlightColor = Color.decode("#ffffff");
     private char layerEnabledSymbol = '\u25a0';
     private char layerDisabledSymbol = '\u25a1';
     private Font font = new Font("Monospace", Font.PLAIN, 24);
@@ -103,28 +110,28 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
     }
 
     protected void initialize() {
-        configButton = new ImageAnnotation("images/config.png");
-        configButton.setScreenPoint(new Point(0, 0));
-        configButton.setPickEnabled(true);
-        addRenderable(configButton);
+        layersButton = new ImageAnnotation(LAYERS_BUTTON);
+        layersButton.setScreenPoint(new Point(0, 0));
+        layersButton.setPickEnabled(true);
+        addRenderable(layersButton);
         
-        linkStateButton = new ImageAnnotation("images/link.png");
+        linkStateButton = new ImageAnnotation(LINK_BUTTON);
         linkStateButton.setPickEnabled(true);
         addRenderable(linkStateButton);
 
-        linkButton = new ImageAnnotation("images/link.png");
+        linkButton = new ImageAnnotation(LINK_BUTTON);
         linkButton.setPickEnabled(true);
 //        addRenderable(linkButton);
 
-        antilinkButton = new ImageAnnotation("images/antilink.png");
+        antilinkButton = new ImageAnnotation(ANTILINK_BUTTON);
         antilinkButton.setPickEnabled(true);
 //        addRenderable(antilinkButton);
 
-        unlinkButton = new ImageAnnotation("images/unlink.png");
+        unlinkButton = new ImageAnnotation(UNLINK_BUTTON);
         unlinkButton.setPickEnabled(true);
 //        addRenderable(unlinkButton);
         
-        flatButton = new ImageAnnotation("images/flat.png");
+        flatButton = new ImageAnnotation(GLOBE_BUTTON);
         flatButton.setPickEnabled(true);
         addRenderable(flatButton);
 
@@ -150,13 +157,13 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
     }
 
     private void displayConfigButton() {
-        addRenderable(configButton);
+//        addRenderable(configButton);
         removeRenderable(layerSelector);
     }
 
     private void displayLayerSelector() {
         addRenderable(layerSelector);
-        removeRenderable(configButton);
+//        removeRenderable(configButton);
     }
 
     /**
@@ -212,7 +219,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
             if (update) {
                 this.update();
             }
-        } else if (event.hasObjects() && event.getTopObject() == configButton) {
+        } else if (event.hasObjects() && event.getTopObject() == layersButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 displayLayerSelector();
             }
@@ -226,7 +233,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         } else if (event.hasObjects() && event.getTopObject() == linkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 wwd.getLinkedView().setLinkState(LinkedViewState.LINKED);
-                linkStateButton.setImageSource("images/link.png");
+                linkStateButton.setImageSource(LINK_BUTTON);
                 removeRenderable(linkButton);
                 removeRenderable(antilinkButton);
                 removeRenderable(unlinkButton);
@@ -235,7 +242,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         } else if (event.hasObjects() && event.getTopObject() == antilinkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 wwd.getLinkedView().setLinkState(LinkedViewState.ANTILINKED);
-                linkStateButton.setImageSource("images/antilink.png");
+                linkStateButton.setImageSource(ANTILINK_BUTTON);
                 removeRenderable(linkButton);
                 removeRenderable(antilinkButton);
                 removeRenderable(unlinkButton);
@@ -244,7 +251,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         } else if (event.hasObjects() && event.getTopObject() == unlinkButton) {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 wwd.getLinkedView().setLinkState(LinkedViewState.UNLINKED);
-                linkStateButton.setImageSource("images/unlink.png");
+                linkStateButton.setImageSource(UNLINK_BUTTON);
                 removeRenderable(linkButton);
                 removeRenderable(antilinkButton);
                 removeRenderable(unlinkButton);
@@ -254,6 +261,11 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 RescModel model = wwd.getModel();
                 model.setFlat(!model.isFlat());
+                if(model.isFlat()) {
+                    flatButton.setImageSource(MAP_BUTTON);
+                } else {
+                    flatButton.setImageSource(GLOBE_BUTTON);
+                }
             }
         } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)
                 && this.layerSelector.getAttributes().isHighlighted()) {
@@ -509,21 +521,21 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
          * TODO Add the other buttons
          */
         this.layerSelector.setScreenPoint(computeLocation(dc.getView().getViewport()));
-        this.configButton.setScreenPoint(getButtonLocation(dc, 0, 0));
-        int x = 100;
+        this.layersButton.setScreenPoint(getButtonLocation(dc, 0, 0));
+        int x = 70;
         this.linkStateButton.setScreenPoint(getButtonLocation(dc, x, 0));
         this.linkButton.setScreenPoint(getButtonLocation(dc, x, 0));
-        this.antilinkButton.setScreenPoint(getButtonLocation(dc, x, 70));
-        this.unlinkButton.setScreenPoint(getButtonLocation(dc, x, 140));
-        x += 130;
-        this.flatButton.setScreenPoint(getButtonLocation(dc, x, 0));
+        this.antilinkButton.setScreenPoint(getButtonLocation(dc, x, -70));
+        this.unlinkButton.setScreenPoint(getButtonLocation(dc, x, -140));
+//        x += 70;
+        this.flatButton.setScreenPoint(getButtonLocation(dc, 0, -70));
         super.render(dc);
     }
 
     private Point getButtonLocation(DrawContext dc, int xOffset, int yOffset) {
-        int x = this.borderWidth + configButton.getPreferredSize(dc).width + xOffset;
-        int y = (int) dc.getView().getViewport().getHeight()
-                - configButton.getPreferredSize(dc).height - this.borderWidth - yOffset;
+        int x = this.borderWidth + layersButton.getPreferredSize(dc).width / 2 + xOffset;
+        int y = (int) 
+                layersButton.getPreferredSize(dc).height / 2 - this.borderWidth - yOffset;
         return new Point(x, y);
     }
 

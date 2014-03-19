@@ -46,7 +46,7 @@ import java.util.Set;
 import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
 
 /**
- * Encapsualtes a {@link SliderWidget} and provides layout management and (TODO)
+ * Encapsulates a {@link SliderWidget} and provides layout management and (TODO)
  * text annotations showing the current value
  * 
  * @author Guy
@@ -54,7 +54,7 @@ import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
 public class SliderWidgetAnnotation extends ScreenAnnotation {
 
     private static final int EDGE_DISTANCE_PX = 60;
-    private static final int SLIDER_WIDTH = 20;
+    private static final int SLIDER_WIDTH = 30;
 
     private final ScreenAnnotation label;
     private final SliderWidget sliderWidget;
@@ -142,6 +142,7 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
         labelAttrs.setBackgroundColor(Color.black);
         labelAttrs.setTextColor(Color.lightGray);
         labelAttrs.setTextAlign(AVKey.CENTER);
+        labelAttrs.setOpacity(0.8);
         
         addChild(label);
         label.getAttributes().setVisible(false);

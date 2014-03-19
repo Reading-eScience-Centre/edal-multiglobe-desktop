@@ -58,7 +58,7 @@ import javax.media.opengl.GL2;
  * The initial implementation was strongly based on {@link ProgressAnnotation}
  */
 public class SliderWidget extends ScreenAnnotation implements SelectListener {
-    private static final int CIRCLE_SIZE = 22;
+    private static final int CIRCLE_SIZE = 32;
 
     final String id;
 

@@ -35,7 +35,6 @@ import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
 import gov.nasa.worldwind.layers.AnnotationLayer;
-import gov.nasa.worldwind.layers.LayerList;
 import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
@@ -55,6 +54,7 @@ import org.jfree.chart.ChartUtilities;
 import org.jfree.chart.JFreeChart;
 import org.joda.time.DateTime;
 
+import uk.ac.rdg.resc.LinkedView.LinkedViewState;
 import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
@@ -88,9 +88,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     private EdalConfigLayer edalConfigLayer;
 
     private AnnotationLayer annotationLayer;
-    private SliderWidgetAnnotation elevationSlider;
+    private SliderWidgetAnnotation elevationSlider = null;
     private String elevationUnits = "";
-    private SliderWidgetAnnotation timeSlider;
+    private SliderWidgetAnnotation timeSlider = null;
     private ImageAnnotation legendAnnotation = null;
 
     /*
@@ -101,11 +101,13 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
     private RescWorldWindow wwd;
 
-    //    private Double elevation;
-    //    private DateTime time;
-
-    private List<RescModel> elevationLinkedModels = new ArrayList<>();
     private List<RescModel> timeLinkedModels = new ArrayList<>();
+
+    /*
+     * Keep a reference to the current feature info balloon so that we can close
+     * it if a user clicks somewhere else
+     */
+    private FeatureInfoBalloon balloon = null;
 
     public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd, MultiGlobeFrame parent) {
         super();
@@ -138,11 +140,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
             }
         };
         getLayers().add(annotationLayer);
-
-        elevationSlider = new SliderWidgetAnnotation(ELEVATION_SLIDER, AVKey.VERTICAL, AVKey.WEST,
-                100, 0, wwd, this);
-        timeSlider = new SliderWidgetAnnotation(TIME_SLIDER, AVKey.HORIZONTAL, AVKey.SOUTH, 0,
-                1000, wwd, this);
 
         //        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
         //        viewControlsLayer.setShowPitchControls(false);
@@ -208,6 +205,15 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
             GridVariableMetadata layerMetadata = gridDataLayer.getLayerMetadata();
             VerticalAxis verticalDomain = layerMetadata.getVerticalDomain();
             if (verticalDomain != null) {
+                if (elevationSlider == null) {
+                    elevationSlider = new SliderWidgetAnnotation(ELEVATION_SLIDER, AVKey.VERTICAL,
+                            AVKey.WEST, verticalDomain.getExtent().getLow(), verticalDomain
+                                    .getExtent().getHigh(), wwd, this);
+                } else {
+                    elevationSlider.setLimits(verticalDomain.getExtent().getLow(), verticalDomain
+                            .getExtent().getHigh());
+                }
+
                 VerticalCrs verticalCrs = verticalDomain.getVerticalCrs();
                 if (verticalCrs != null) {
                     /*
@@ -230,7 +236,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                 elevationSlider.setSliderValue(gridDataLayer.getElevation());
 
                 List<RescModel> allModels = parent.getAllModels();
-                elevationLinkedModels.clear();
                 for (RescModel model : allModels) {
                     if (model != this && model.elevationSlider != null
                             && model.elevationSlider.equalLimits(elevationSlider)) {
@@ -240,35 +245,39 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                             gridDataLayer.setElevation(model.elevationSlider.getSliderValue());
                         }
                     }
-                    //                    if (model.elevationSlider.equalLimits(elevationSlider)) {
-                    //                        elevationLinkedModels.add(model);
-                    //                        if (!model.elevationLinkedModels.contains(this)) {
-                    //                            model.elevationLinkedModels.add(this);
-                    //                        }
-                    //                        if (model != this && model.gridDataLayer != null) {
-                    //                            elevationSlider.setSliderValue(model.elevationSlider.getSliderValue());
-                    //                            gridDataLayer.setElevation(model.elevationSlider.getSliderValue());
-                    //                        }
-                    //                    }
                 }
 
                 /*
                  * Add the elevation slider
                  */
                 annotationLayer.addAnnotation(elevationSlider);
+            } else {
+                elevationSlider = null;
             }
 
             TimeAxis tAxis = layerMetadata.getTemporalDomain();
             if (tAxis != null) {
-                timeSlider.setLimits(tAxis.getExtent().getLow().getMillis(), tAxis.getExtent()
-                        .getHigh().getMillis());
+                if (timeSlider == null) {
+                    timeSlider = new SliderWidgetAnnotation(TIME_SLIDER, AVKey.HORIZONTAL,
+                            AVKey.SOUTH, tAxis.getExtent().getLow().getMillis(), tAxis.getExtent()
+                                    .getHigh().getMillis(), wwd, this);
+                } else {
+                    timeSlider.setLimits(tAxis.getExtent().getLow().getMillis(), tAxis.getExtent()
+                            .getHigh().getMillis());
+                }
                 timeSlider.setSliderValue(gridDataLayer.getTime().getMillis());
 
                 List<RescModel> allModels = parent.getAllModels();
                 timeLinkedModels.clear();
+                timeLinkedModels.add(this);
                 for (RescModel model : allModels) {
                     if (model != this && model.timeSlider != null
                             && model.timeSlider.equalLimits(timeSlider)) {
+                        timeLinkedModels.add(model);
+                        if (!model.timeLinkedModels.contains(this)) {
+                            model.timeLinkedModels.add(this);
+                        }
+
                         timeSlider.linkSlider(model.timeSlider);
                         if (model.gridDataLayer != null) {
                             timeSlider.setSliderValue(model.timeSlider.getSliderValue());
@@ -281,6 +290,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                  * Add the time slider
                  */
                 annotationLayer.addAnnotation(timeSlider);
+            } else {
+                timeSlider = null;
             }
         }
         edalLayerName = layerName;
@@ -302,17 +313,36 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
          * Only display feature info if we have an active layer
          */
         if (edalLayerName != null && !edalLayerName.equals("")) {
-            for (RescModel model : timeLinkedModels) {
-                if (model.wwd.getLinkedView().getLinkedViewState()
-                        .equals(wwd.getLinkedView().getLinkedViewState())) {
-                    model.doShowFeatureInfo(position);
+            doShowFeatureInfo(position);
+            /*
+             * Now if this view is linked with other views, and we have a time
+             * axis, we may want to display feature info on the other views
+             */
+            if (wwd.getLinkedView().getLinkedViewState() == LinkedViewState.LINKED
+                    || wwd.getLinkedView().getLinkedViewState() == LinkedViewState.ANTILINKED
+                    && timeSlider != null) {
+                for (RescModel model : parent.getAllModels()) {
+                    /*
+                     * If another model has the same time value selected and has
+                     * its view in sync with this one, we want to display
+                     * feature info on it as well
+                     */
+                    if (model != this
+                            && model.timeSlider.getSliderValue() == timeSlider.getSliderValue()
+                            && wwd.getLinkedView().getLinkedViewState()
+                                    .equals(model.wwd.getLinkedView().getLinkedViewState())) {
+                        model.doShowFeatureInfo(position);
+                    }
                 }
             }
         }
     }
 
     private void doShowFeatureInfo(final Position position) {
-        final FeatureInfoBalloon balloon = new FeatureInfoBalloon(position, wwd, annotationLayer);
+        if(balloon != null) {
+            annotationLayer.removeAnnotation(balloon);
+        }
+        balloon = new FeatureInfoBalloon(position, wwd, annotationLayer);
         annotationLayer.addAnnotation(balloon);
 
         /*

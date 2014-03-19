@@ -98,8 +98,11 @@ public class LinkedView extends BasicOrbitView {
         if (this != view) {
             linkedViews.add(view);
             view.linkedViews.add(this);
-//            linkState = LinkedViewState.LINKED;
             view.linkState = LinkedViewState.LINKED;
+            view.setCenterPosition(this.center);
+            view.setHeading(this.heading);
+            view.setPitch(this.pitch);
+            view.setZoom(this.zoom);
         }
     }
 

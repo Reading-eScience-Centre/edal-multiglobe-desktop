@@ -453,16 +453,16 @@ public class EdalGridDataLayer {
 
         AVList params = new AVListImpl();
 
-        params.setValue(AVKey.TILE_WIDTH, 128);
-        params.setValue(AVKey.TILE_HEIGHT, 128);
+        params.setValue(AVKey.TILE_WIDTH, 512);
+        params.setValue(AVKey.TILE_HEIGHT, 512);
         params.setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
         params.setValue(AVKey.SERVICE, "*");
         params.setValue(AVKey.DATASET_NAME, layerId);
         params.setValue(AVKey.FORMAT_SUFFIX, ".png");
-        params.setValue(AVKey.NUM_LEVELS, 10);
+        params.setValue(AVKey.NUM_LEVELS, 5);
         params.setValue(AVKey.NUM_EMPTY_LEVELS, 0);
         params.setValue(AVKey.LEVEL_ZERO_TILE_DELTA,
-                new LatLon(Angle.fromDegrees(36d), Angle.fromDegrees(36d)));
+                new LatLon(Angle.fromDegrees(60d), Angle.fromDegrees(60d)));
         params.setValue(AVKey.SECTOR, Sector.FULL_SPHERE);
 
         return new LevelSet(params);
