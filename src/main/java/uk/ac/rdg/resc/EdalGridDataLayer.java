@@ -51,6 +51,9 @@ import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.media.opengl.GLContext;
 
@@ -92,6 +95,10 @@ public class EdalGridDataLayer {
     private GridVariableMetadata metadata;
     private Extent<Float> scaleRange;
 
+    private ExecutorService threadPool;
+    private TimeCacher timeCacheTask = null;
+    private ElevationCacher elevationCacheTask = null;
+
     public EdalGridDataLayer(String layerName, VideoWallCatalogue catalogue, LayerList layerList,
             RescWorldWindow wwd) throws EdalException {
         this.layerName = layerName;
@@ -117,6 +124,8 @@ public class EdalGridDataLayer {
         if (tAxis != null) {
             this.time = GISUtils.getClosestToCurrentTime(tAxis);
         }
+
+        threadPool = Executors.newFixedThreadPool(2);
 
         cacheFromCurrent();
 
@@ -174,9 +183,6 @@ public class EdalGridDataLayer {
         wwd.redraw();
     }
 
-    private TimeCacher timeCacheThread = null;
-    private ElevationCacher elevationCacheThread = null;
-
     /**
      * Preloads into the GPU texture cache:
      * 
@@ -189,36 +195,31 @@ public class EdalGridDataLayer {
      * will not be recomputed, so this method should be quick to run.
      */
     public void cacheFromCurrent() {
-        if (tAxis != null) {
-            if (timeCacheThread != null && timeCacheThread.isAlive()) {
-                timeCacheThread.stopCaching();
-                try {
-                    timeCacheThread.join();
-                } catch (InterruptedException e) {
-                    /*
-                     * Ignore this exception, the thread will stop anyway
-                     */
-                }
-            }
+        if (timeCacheTask != null) {
+            timeCacheTask.stopCaching();
+        }
+        if (elevationCacheTask != null) {
+            elevationCacheTask.stopCaching();
+        }
 
-            timeCacheThread = new TimeCacher(time, elevation);
-            timeCacheThread.start();
+        threadPool.shutdown();
+        try {
+            threadPool.awaitTermination(20L, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            /*
+             * Nothing we can do about this
+             */
+        }
+        threadPool = Executors.newFixedThreadPool(2);
+
+        if (tAxis != null) {
+            timeCacheTask = new TimeCacher(time, elevation);
+            threadPool.submit(timeCacheTask);
         }
 
         if (zAxis != null) {
-            if (elevationCacheThread != null && elevationCacheThread.isAlive()) {
-                elevationCacheThread.stopCaching();
-                try {
-                    elevationCacheThread.join();
-                } catch (InterruptedException e) {
-                    /*
-                     * Ignore this exception, the thread will stop anyway
-                     */
-                }
-            }
-
-            elevationCacheThread = new ElevationCacher(elevation, time);
-            elevationCacheThread.start();
+            elevationCacheTask = new ElevationCacher(elevation, time);
+            threadPool.submit(elevationCacheTask);
         }
     }
 
@@ -468,7 +469,7 @@ public class EdalGridDataLayer {
         return new LevelSet(params);
     }
 
-    private class TimeCacher extends Thread {
+    private class TimeCacher implements Runnable {
         private boolean stop = false;
         private DateTime time;
         private Double elevation;
@@ -497,8 +498,8 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-            //            System.out.println("cached times for layer: " + layerName + " at elevation "
-            //                    + elevation);
+//            System.out.println("cached times for layer: " + layerName + " at elevation "
+//                    + elevation);
         }
 
         public void stopCaching() {
@@ -506,7 +507,7 @@ public class EdalGridDataLayer {
         }
     }
 
-    private class ElevationCacher extends Thread {
+    private class ElevationCacher implements Runnable {
         private boolean stop = false;
         private DateTime time;
         private Double elevation;
@@ -535,8 +536,7 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-            //            System.out.println("cached elevations for layer: " + layerName + " at time "
-            //                    + time);
+//            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
         }
 
         public void stopCaching() {
