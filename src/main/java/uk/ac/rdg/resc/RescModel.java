@@ -120,9 +120,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         flatMap = new EarthFlat();
         setGlobe(globe);
 
-        edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
-        getLayers().add(edalConfigLayer);
-
         annotationLayer = new AnnotationLayer() {
             @Override
             protected void doRender(DrawContext dc) {
@@ -141,6 +138,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         };
         getLayers().add(annotationLayer);
 
+        edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
+        getLayers().add(edalConfigLayer);
+        
         //        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
         //        viewControlsLayer.setShowPitchControls(false);
         //        viewControlsLayer.setShowVeControls(false);
@@ -162,6 +162,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     public void setDataLayer(String layerName) {
+        System.out.println("setting data layer: "+layerName);
         if (layerName != null && !layerName.equals(edalLayerName)) {
             /*
              * TODO here's where we check whether we have a gridded or point

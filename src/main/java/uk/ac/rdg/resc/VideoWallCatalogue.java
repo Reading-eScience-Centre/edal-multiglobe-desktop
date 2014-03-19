@@ -85,7 +85,7 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         variables = new HashMap<>();
         gridFeatures = new HashMap<>();
 
-        rootMenuNode = new ActiveLayerMenuItem("Root", "root", false, false);
+        rootMenuNode = new ActiveLayerMenuItem("Datasets", "root", false, false);
     }
 
     @Override

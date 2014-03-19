@@ -498,8 +498,8 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-//            System.out.println("cached times for layer: " + layerName + " at elevation "
-//                    + elevation);
+            System.out.println("cached times for layer: " + layerName + " at elevation "
+                    + elevation);
         }
 
         public void stopCaching() {
@@ -536,7 +536,7 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-//            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
+            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
         }
 
         public void stopCaching() {
