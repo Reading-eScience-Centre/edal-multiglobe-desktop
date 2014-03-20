@@ -31,13 +31,23 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.event.SelectEvent;
 import gov.nasa.worldwind.event.SelectListener;
+import gov.nasa.worldwind.render.Annotation;
+import gov.nasa.worldwind.render.AnnotationAttributes;
 import gov.nasa.worldwind.render.AnnotationFlowLayout;
+import gov.nasa.worldwind.render.AnnotationNullLayout;
+import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.render.ScreenAnnotation;
+import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.Insets;
 import java.awt.Point;
-import java.util.ArrayList;
+import java.awt.Rectangle;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
@@ -50,8 +60,17 @@ import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
  */
 public class LayerSelectorWidget extends ScreenAnnotation implements SelectListener {
 
+    /*
+     * The horizontal gap to use in annotation flow layouts
+     */
+    private static final int HGAP = 4;
+
+    private static final String EXPAND_IMAGE = "images/expand_button.png";
+    private static final String BACK_IMAGE = "images/back_button.png";
+    private static final String CLOSE_IMAGE = "images/close_button.png";
+
     private RescWorldWindow wwd;
-    
+
     private LayerMenuItem rootItem;
     private LayerMenuItem currentItem;
 
@@ -66,26 +85,37 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
     //    private List<ScreenAnnotation> pickableItems;
     private Map<ScreenAnnotation, Runnable> pickableItems;
 
-
     public LayerSelectorWidget(RescWorldWindow wwd) {
         super("", new Point());
-        
+
         this.wwd = wwd;
 
         titleAnnotation = new ScreenAnnotation("Datasets", new Point());
-        //        pickableItems = new ArrayList<>();
+        setDefaultButtonAttributes(titleAnnotation.getAttributes());
+        titleAnnotation.getAttributes().setFont(new Font("SansSerif", Font.BOLD, 16));
+
         pickableItems = new HashMap<>();
 
-        this.setLayout(new AnnotationFlowLayout(AVKey.HORIZONTAL, AVKey.CENTER, 4, 0));
+        this.setLayout(new AnnotationFlowLayout(AVKey.HORIZONTAL, AVKey.CENTER, HGAP, 0));
 
         menuItemPanel = new ScreenAnnotation("", new Point());
-        menuItemPanel.setLayout(new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.CENTER, 0, 4));
+        AnnotationFlowLayout layout = new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.RIGHT, 0, 4);
+        menuItemPanel.setLayout(layout);
+        WidgetUtils.setupContainerAttributes(menuItemPanel.getAttributes());
 
         menuItemPanel.addChild(titleAnnotation);
 
-        backButton = new ScreenAnnotation("Back", new Point());
+        backButton = new ImageAnnotation(CLOSE_IMAGE);
+        backButton.getAttributes().setBackgroundColor(Color.black);
+        backButton.getAttributes().setInsets(null);
+        backButton.setPickEnabled(true);
+
         this.addChild(backButton);
         this.addChild(menuItemPanel);
+
+        getAttributes().setBackgroundColor(new Color(0, 0, 0, 64));
+        getAttributes().setCornerRadius(10);
+        getAttributes().setOpacity(0.8);
     }
 
     public void populateLayerSelector(LayerMenuItem rootItem) {
@@ -97,11 +127,17 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
      * items in the menu
      */
     public void displayDatasets() {
-//        showItems("Datasets", rootItem.getChildren());
+        //        showItems("Datasets", rootItem.getChildren());
         showItems(rootItem);
     }
 
     private void showItems(LayerMenuItem parentItem) {
+        if (parentItem == rootItem) {
+            backButton.getAttributes().setImageSource(CLOSE_IMAGE);
+        } else {
+            backButton.getAttributes().setImageSource(BACK_IMAGE);
+        }
+
         currentItem = parentItem;
         /*
          * We could keep track of all the non-title elements and remove them
@@ -117,40 +153,44 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
         menuItemPanel.addChild(titleAnnotation);
 
         for (final LayerMenuItem item : parentItem.getChildren()) {
+            /*
+             * TODO add preview images to each button? May make them too big,
+             * and it's an optional extra rather than a must-have
+             */
             ScreenAnnotation menuItem = null;
             if (item.isPlottable()) {
-                if (item.isLeaf()) {
-                    menuItem = new ScreenAnnotation(item.getTitle(), new Point());
-                    pickableItems.put(menuItem, new Runnable() {
-                        @Override
-                        public void run() {
-                            System.out.println("Will plot layer: " + item.getTitle());
-                            plot(item.getId());
-                        }
-                    });
-                } else {
-                    menuItem = new ScreenAnnotation("", new Point());
-                    menuItem.setLayout(new AnnotationFlowLayout(AVKey.HORIZONTAL, AVKey.CENTER, 4, 0));
-                    ScreenAnnotation plot = new ScreenAnnotation(item.getTitle(), new Point());
-                    ScreenAnnotation expand = new ScreenAnnotation("+", new Point());
-                    pickableItems.put(plot, new Runnable() {
-                        @Override
-                        public void run() {
-                            System.out.println("Will plot layer: " + item.getTitle());
-                            plot(item.getId());
-                        }
-                    });
+                /*
+                 * We have a plottable item, so we want to set the data layer
+                 * when we click it.
+                 */
+                menuItem = new ScreenAnnotation(item.getTitle(), new Point());
+                setDefaultButtonAttributes(menuItem.getAttributes());
+                pickableItems.put(menuItem, new Runnable() {
+                    @Override
+                    public void run() {
+                        plot(item.getId());
+                    }
+                });
+
+                if (!item.isLeaf()) {
+                    /*
+                     * This item is also expandable, so we add a clickable
+                     * expand link
+                     */
+                    menuItem.setLayout(new AnnotationNullLayout());
+                    ScreenAnnotation expand = new ImageAnnotation(EXPAND_IMAGE);
+                    expand.setPickEnabled(true);
                     pickableItems.put(expand, new Runnable() {
                         @Override
                         public void run() {
                             showItems(item);
                         }
                     });
-                    menuItem.addChild(plot);
                     menuItem.addChild(expand);
                 }
             } else if (!item.isLeaf()) {
                 menuItem = new ScreenAnnotation(item.getTitle(), new Point());
+                setDefaultButtonAttributes(menuItem.getAttributes());
                 pickableItems.put(menuItem, new Runnable() {
                     @Override
                     public void run() {
@@ -167,12 +207,13 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
                  */
                 menuItem = new ScreenAnnotation(item.getTitle(), new Point());
             }
+            menuItem.getAttributes().setBackgroundColor(new Color(0, 0, 0, 150));
             menuItemPanel.addChild(menuItem);
         }
     }
-    
+
     private void plot(String layer) {
-        if(wwd != null && wwd.getModel() != null) {
+        if (wwd != null && wwd.getModel() != null) {
             wwd.getModel().setDataLayer(layer);
         }
         getAttributes().setVisible(false);
@@ -184,8 +225,10 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
             Object pickedObj = event.getTopObject();
             if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
                 if (pickedObj == backButton) {
-                    if(currentItem != null && currentItem.getParent() != null) {
+                    if (currentItem != null && currentItem.getParent() != null) {
                         showItems(currentItem.getParent());
+                    } else {
+                        getAttributes().setVisible(false);
                     }
                 } else {
                     Runnable run = null;
@@ -199,7 +242,50 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
                         run.run();
                     }
                 }
+            } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
+                if (pickableItems.containsKey(pickedObj) || pickedObj == backButton) {
+                    ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
+                } else {
+                    ((Component) wwd).setCursor(Cursor.getDefaultCursor());
+                }
             }
         }
+    }
+
+    @Override
+    public void render(DrawContext dc) {
+        super.render(dc);
+        Dimension size = getAttributes().getSize();
+
+        int backWidth = backButton.getPreferredSize(dc).width;
+
+        for (Annotation child : menuItemPanel.getChildren()) {
+            /*
+             * Set the size of menu items
+             */
+            child.getAttributes().setSize(new Dimension(size.width - backWidth * 2, 0));
+            if (child.getChildren().size() > 0) {
+                /*
+                 * This means that we have an expand button.
+                 */
+                Annotation expand = child.getChildren().get(0);
+
+                Dimension expandSize = expand.getPreferredSize(dc);
+
+                expand.getAttributes().setDrawOffset(
+                        new Point(size.width - backWidth * 2 - expandSize.width - 2 * HGAP, 0));
+            }
+        }
+
+    }
+
+    private static void setDefaultButtonAttributes(AnnotationAttributes attrs) {
+        attrs.setAdjustWidthToText(AVKey.SIZE_FIXED);
+        attrs.setTextAlign(AVKey.CENTER);
+        attrs.setBackgroundColor(Color.black);
+        attrs.setTextColor(Color.white);
+        attrs.setCornerRadius(10);
+        attrs.setBorderWidth(1);
+        attrs.setInsets(new Insets(10, 0, 10, 0));
     }
 }

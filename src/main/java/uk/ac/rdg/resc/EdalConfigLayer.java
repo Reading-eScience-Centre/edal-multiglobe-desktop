@@ -151,16 +151,10 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         this.wwd.addSelectListener(this);
     }
 
-    private void hideLayerSelector() {
-        removeRenderable(layerSelector);
-        layerSelector.getAttributes().setVisible(true);
-    }
-
     private void displayLayerSelector() {
         layerSelector.populateLayerSelector(catalogue.getEdalLayers());
         layerSelector.displayDatasets();
         layerSelector.getAttributes().setVisible(true);
-//        addRenderable(layerSelector);
     }
 
     /**
@@ -283,8 +277,9 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
     @Override
     public void render(DrawContext dc) {
         Rectangle viewport = dc.getView().getViewport();
-        this.layerSelector.setScreenPoint(new Point(viewport.x + viewport.width / 2, viewport.y + borderWidth / 2));
-        this.layerSelector.getAttributes().setSize(new Dimension(viewport.width - borderWidth, viewport.height - borderWidth));
+        this.layerSelector.getAttributes().setSize(new Dimension(viewport.width - borderWidth, 0));
+        Dimension layerSelectorActualSize = layerSelector.getPreferredSize(dc);
+        this.layerSelector.setScreenPoint(new Point(viewport.x + viewport.width / 2, viewport.y + borderWidth / 2 + (viewport.height - layerSelectorActualSize.height)/2));
         //        this.layerSelector.setScreenPoint(computeLocation(dc.getView().getViewport()));
         this.layersButton.setScreenPoint(getButtonLocation(dc, 0, 0));
         int x = 70;

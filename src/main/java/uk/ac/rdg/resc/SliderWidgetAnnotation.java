@@ -77,7 +77,7 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
         this.position = position;
 
         AnnotationAttributes attributes = new AnnotationAttributes();
-        setupDefaultAttributes(attributes);
+        WidgetUtils.setupContainerAttributes(attributes);
         getAttributes().setDefaults(attributes);
 
         setLayout(new AnnotationNullLayout());
@@ -244,24 +244,5 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
 
         annotation.setPickEnabled(false);
         annotation.getAttributes().setDefaults(attributes);
-    }
-
-    protected void setupDefaultAttributes(AnnotationAttributes attributes) {
-        Color transparentBlack = new Color(0, 0, 0, 0);
-
-        attributes.setBackgroundColor(transparentBlack);
-        attributes.setBorderColor(transparentBlack);
-        attributes.setBorderWidth(0);
-        attributes.setCornerRadius(0);
-        attributes.setDrawOffset(new java.awt.Point(0, 0));
-        attributes.setHighlightScale(1);
-        attributes.setInsets(new java.awt.Insets(0, 0, 0, 0));
-        attributes.setLeader(AVKey.SHAPE_NONE);
-
-        /*
-         * Container attributes
-         */
-        attributes.setAdjustWidthToText(AVKey.SIZE_FIXED);
-        attributes.setSize(new java.awt.Dimension(0, 0));
     }
 }

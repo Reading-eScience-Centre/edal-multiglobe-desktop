@@ -244,7 +244,7 @@ public class EdalGridDataLayer {
         }
         /*
          * Now get the GLContext, dump the textures into the cache and release
-         * it
+         * it.
          */
         GLContext context = wwd.getContext();
         context.makeCurrent();
@@ -454,8 +454,8 @@ public class EdalGridDataLayer {
 
         AVList params = new AVListImpl();
 
-        params.setValue(AVKey.TILE_WIDTH, 512);
-        params.setValue(AVKey.TILE_HEIGHT, 512);
+        params.setValue(AVKey.TILE_WIDTH, 256);
+        params.setValue(AVKey.TILE_HEIGHT, 256);
         params.setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
         params.setValue(AVKey.SERVICE, "*");
         params.setValue(AVKey.DATASET_NAME, layerId);
@@ -498,8 +498,8 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-            System.out.println("cached times for layer: " + layerName + " at elevation "
-                    + elevation);
+//            System.out.println("cached times for layer: " + layerName + " at elevation "
+//                    + elevation);
         }
 
         public void stopCaching() {
@@ -536,7 +536,7 @@ public class EdalGridDataLayer {
             /*
              * TODO This would be a useful debug statement in the logging
              */
-            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
+//            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
         }
 
         public void stopCaching() {
