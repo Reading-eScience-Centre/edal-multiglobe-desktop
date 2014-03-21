@@ -26,25 +26,30 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-package uk.ac.rdg.resc.old;
+package uk.ac.rdg.resc.widgets;
 
-import gov.nasa.worldwind.util.tree.BasicTreeNode;
+import gov.nasa.worldwind.avlist.AVKey;
+import gov.nasa.worldwind.render.AnnotationAttributes;
 
-public class EdalTreeNode extends BasicTreeNode {
+import java.awt.Color;
 
-    public EdalTreeNode(String text) {
-        super(text);
-    }
+public class WidgetUtils {
+    protected static void setupContainerAttributes(AnnotationAttributes attributes) {
+        Color transparentBlack = new Color(0, 0, 0, 0);
 
-    public EdalTreeNode(String text, Object imageSource) {
-        super(text, imageSource);
-    }
-    
-    @Override
-    public void setSelected(boolean selected) {
-        super.setSelected(selected);
+        attributes.setBackgroundColor(transparentBlack);
+        attributes.setBorderColor(transparentBlack);
+        attributes.setBorderWidth(0);
+        attributes.setCornerRadius(0);
+        attributes.setDrawOffset(new java.awt.Point(0, 0));
+        attributes.setHighlightScale(1);
+        attributes.setInsets(new java.awt.Insets(0, 0, 0, 0));
+        attributes.setLeader(AVKey.SHAPE_NONE);
+
         /*
-         * TODO deal with setting layer on/off here.
+         * Container attributes
          */
+        attributes.setAdjustWidthToText(AVKey.SIZE_FIXED);
+        attributes.setSize(new java.awt.Dimension(0, 0));
     }
 }

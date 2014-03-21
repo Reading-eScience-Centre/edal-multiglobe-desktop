@@ -43,8 +43,8 @@ public class MultiGlobeFrame extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private List<RescWorldWindow> panels = new ArrayList<>();
-    private int rows;
-    private int columns;
+    private int rows = 0;
+    private int columns = 0;
 
     private VideoWallCatalogue featureCatalogue;
 
@@ -76,58 +76,89 @@ public class MultiGlobeFrame extends JPanel {
         }
     }
 
-    public int getColumns() {
-        return columns;
-    }
-
-    public int getRows() {
-        return rows;
-    }
-
-    public RescModel getModel(int row, int column) {
-        return getPanel(row, column).getModel();
-    }
-
-    public void setShape(int rows, int columns) {
-        this.rows = rows;
-        this.columns = columns;
-
-        while (panels.size() > rows * columns) {
-            panels.remove(panels.size() - 1);
-            remove(getComponentCount() - 1);
+    private void setShape(int rows, int columns) {
+        /*
+         * Remove all necessary rows
+         */
+        while (this.rows > rows) {
+            for (int i = this.columns - 1; i >= 0; i--) {
+                panels.remove(getIndex(this.rows - 1, i));
+                remove(getIndex(this.rows - 1, i));
+            }
+            this.rows--;
         }
+
+        /*
+         * Remove all necessary columns
+         */
+        while (this.columns > columns) {
+            for (int i = this.rows - 1; i >= 0; i--) {
+                panels.remove(getIndex(i, this.columns - 1));
+                remove(getIndex(i, this.columns - 1));
+            }
+            this.columns--;
+        }
+
+        /*
+         * Add any required rows
+         */
+        while (this.rows < rows) {
+            for (int i = 0; i < this.columns; i++) {
+                RescWorldWindow newPanel = getNewPanel();
+                panels.add(newPanel);
+                add(newPanel);
+            }
+            this.rows++;
+        }
+
+        /*
+         * Add any required columns
+         */
+        while (this.columns < columns) {
+            /*
+             * Add from the bottom up, otherwise the indexes change
+             */
+            for (int i = this.rows - 1; i >= 0; i--) {
+                RescWorldWindow newPanel = getNewPanel();
+                panels.add(getIndex(i, this.columns), newPanel);
+                add(newPanel, getIndex(i, this.columns));
+            }
+            this.columns++;
+        }
+
+        /*
+         * Now set the layour
+         */
         GridLayout gridLayout = new GridLayout(rows, columns, 2, 2);
         setLayout(gridLayout);
-        
-        while (panels.size() < rows * columns) {
-            RescWorldWindow wwd = new RescWorldWindow(new LinkedView());
-            wwd.setModel(new RescModel(featureCatalogue, wwd, this));
-            wwd.setVisible(true);
-            for (int i = 0; i < panels.size(); i++) {
-                panels.get(i).getLinkedView().addLinkedView(wwd.getLinkedView());
-            }
-            panels.add(wwd);
-            add(wwd);
-        }
-        
-        for(RescWorldWindow panel : panels) {
+
+        /*
+         * Redraw all panels
+         */
+        for (RescWorldWindow panel : panels) {
             panel.redraw();
         }
+
+        /*
+         * validate() needs to be called after add/remove
+         */
         this.validate();
     }
 
-    public RescWorldWindow getPanel(int row, int column) {
-        if (row >= rows || column >= columns) {
-            throw new ArrayIndexOutOfBoundsException("Cannot get panel at " + row + "," + column
-                    + ".  This frame is " + rows + "x" + columns);
+    private RescWorldWindow getNewPanel() {
+        RescWorldWindow wwd = new RescWorldWindow(new LinkedView());
+        wwd.setModel(new RescModel(featureCatalogue, wwd, this));
+        wwd.setVisible(true);
+        for (int i = 0; i < panels.size(); i++) {
+            panels.get(i).getLinkedView().addLinkedView(wwd.getLinkedView());
         }
-        return panels.get(getIndex(row, column));
+        return wwd;
     }
 
     private int getIndex(int row, int column) {
-        return row * rows + column;
+        return row * columns + column;
     }
-    
+
     public List<RescModel> getAllModels() {
         return new AbstractList<RescModel>() {
             @Override

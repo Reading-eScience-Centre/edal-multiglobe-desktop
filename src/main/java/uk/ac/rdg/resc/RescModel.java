@@ -31,6 +31,8 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.BasicModel;
 import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.avlist.AVKey;
+import gov.nasa.worldwind.event.SelectEvent;
+import gov.nasa.worldwind.event.SelectListener;
 import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
@@ -39,6 +41,8 @@ import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
@@ -55,7 +59,6 @@ import org.jfree.chart.JFreeChart;
 import org.joda.time.DateTime;
 
 import uk.ac.rdg.resc.LinkedView.LinkedViewState;
-import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
@@ -67,8 +70,11 @@ import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.position.VerticalCrs;
 import uk.ac.rdg.resc.edal.util.TimeUtils;
+import uk.ac.rdg.resc.widgets.FeatureInfoBalloon;
+import uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler;
+import uk.ac.rdg.resc.widgets.SliderWidgetAnnotation;
 
-public class RescModel extends BasicModel implements SliderWidgetHandler {
+public class RescModel extends BasicModel implements SliderWidgetHandler, SelectListener {
     private final static String ELEVATION_SLIDER = "depth-slider";
     private final static String TIME_SLIDER = "time-slider";
 
@@ -109,6 +115,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      */
     private FeatureInfoBalloon balloon = null;
 
+    private boolean legendRefresh = false;
+    private boolean legendShrunk = false;
+
     public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd, MultiGlobeFrame parent) {
         super();
 
@@ -121,18 +130,26 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         setGlobe(globe);
 
         annotationLayer = new AnnotationLayer() {
+
             @Override
             protected void doRender(DrawContext dc) {
                 super.doRender(dc);
                 if (gridDataLayer != null) {
                     Rectangle viewport = dc.getView().getViewport();
-                    if (viewport.height != lastViewportHeight) {
+                    if (viewport.height != lastViewportHeight || legendRefresh) {
                         lastViewportHeight = viewport.height;
                         addLegend(viewport.height / 2);
                     }
-                    int width = ((BufferedImage) legendAnnotation.getImageSource()).getWidth();
-                    legendAnnotation.setScreenPoint(new Point(viewport.x + viewport.width - width,
-                            viewport.y + viewport.height / 4));
+                    int width = (int) (((BufferedImage) legendAnnotation.getImageSource())
+                            .getWidth() * legendAnnotation.getAttributes().getImageScale());
+                    int height = (int) (((BufferedImage) legendAnnotation.getImageSource())
+                            .getHeight() * legendAnnotation.getAttributes().getImageScale());
+
+                    int xOffset = legendShrunk ? -10 : 10;
+                    int yOffset = legendShrunk ? 10 : height / 2;
+
+                    legendAnnotation.setScreenPoint(new Point(viewport.x + viewport.width - width
+                            + xOffset, viewport.y + yOffset));
                 }
             }
         };
@@ -140,12 +157,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
         edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
         getLayers().add(edalConfigLayer);
-        
-        //        ViewControlsLayer viewControlsLayer = new ViewControlsLayer();
-        //        viewControlsLayer.setShowPitchControls(false);
-        //        viewControlsLayer.setShowVeControls(false);
-        //        getLayers().add(viewControlsLayer);
-        //        wwd.addSelectListener(new ViewControlsSelectListener(wwd, viewControlsLayer));
+
+        wwd.addSelectListener(this);
     }
 
     public void setFlat(boolean flat) {
@@ -162,7 +175,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     public void setDataLayer(String layerName) {
-        System.out.println("setting data layer: "+layerName);
+        System.out.println("setting data layer: " + layerName);
         if (layerName != null && !layerName.equals(edalLayerName)) {
             /*
              * TODO here's where we check whether we have a gridded or point
@@ -202,6 +215,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              * any feature info balloons
              */
             annotationLayer.removeAllAnnotations();
+
+            legendRefresh = true;
 
             GridVariableMetadata layerMetadata = gridDataLayer.getLayerMetadata();
             VerticalAxis verticalDomain = layerMetadata.getVerticalDomain();
@@ -302,11 +317,35 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         if (legendAnnotation != null) {
             annotationLayer.removeAnnotation(legendAnnotation);
         }
-        BufferedImage legend = gridDataLayer.getLegend(size);
+        BufferedImage legend = gridDataLayer.getLegend(size, true);
         if (legend != null) {
-            legendAnnotation = new ImageAnnotation(legend);
+            if (legend.getWidth() > size) {
+                /*
+                 * We have a big legend - i.e. a multidimensional field
+                 */
+
+                /*
+                 * First get a new legend with field labels
+                 */
+                legend = gridDataLayer.getLegend(size, true);
+                legendAnnotation = new ImageAnnotation(legend);
+                legendShrunk = true;
+                shrinkLegend(100);
+            } else {
+                legendAnnotation = new ImageAnnotation(legend);
+                legendShrunk = false;
+            }
+            legendRefresh = false;
+            legendAnnotation.setPickEnabled(true);
             annotationLayer.addAnnotation(legendAnnotation);
         }
+    }
+
+    private void shrinkLegend(int desiredSize) {
+        BufferedImage legend = (BufferedImage) legendAnnotation.getAttributes().getImageSource();
+        legendAnnotation.getAttributes().setImageScale((double) desiredSize / legend.getWidth());
+        legendAnnotation.getAttributes().setDrawOffset(
+                new Point(legend.getWidth() / 2, -legend.getHeight() + desiredSize));
     }
 
     public void showFeatureInfo(final Position position) {
@@ -340,7 +379,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     private void doShowFeatureInfo(final Position position) {
-        if(balloon != null) {
+        if (balloon != null) {
             annotationLayer.removeAnnotation(balloon);
         }
         balloon = new FeatureInfoBalloon(position, wwd, annotationLayer);
@@ -529,6 +568,47 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         if (gridDataLayer != null) {
             gridDataLayer.cacheFromCurrent();
             //            EdalDataLayer.premptivelyCacheLayer(edalLayerName, elevation, time, catalogue);
+        }
+    }
+
+    @Override
+    public void selected(SelectEvent event) {
+        /*
+         * TODO Move the legend handling to the EdalConfigLayer, since it is not
+         * just an annotation
+         */
+        /*
+         * Listen for clicks on the legend.
+         */
+        if (event.hasObjects()) {
+            if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
+                if (event.getTopObject() == legendAnnotation) {
+                    if (legendShrunk) {
+                        /*
+                         * We have a shrunk version of the legend, in which case
+                         * we want to expand it
+                         */
+                        if (legendAnnotation.getAttributes().getImageScale() == 1.0) {
+                            shrinkLegend(100);
+                        } else {
+                            legendAnnotation.getAttributes().setImageScale(1.0);
+                            legendAnnotation.getAttributes().getDrawOffset().y = 0;
+                        }
+                    } else {
+                        /*
+                         * We have a normal legend, so we want to bring up the
+                         * scale configuration dialog
+                         */
+                    }
+                }
+            } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
+                if (event.getTopObject() == legendAnnotation) {
+                    ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
+                    event.consume();
+                } else {
+                    ((Component) wwd).setCursor(Cursor.getDefaultCursor());
+                }
+            }
         }
     }
 }

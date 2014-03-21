@@ -49,6 +49,7 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
@@ -64,23 +65,23 @@ import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.geometry.BoundingBox;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
-import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
-import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.MapImage;
-import uk.ac.rdg.resc.edal.graphics.style.RasterLayer;
-import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.grid.TimeAxis;
 import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.GridVariableMetadata;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
+import uk.ac.rdg.resc.edal.wms.GetMapStyleParams;
+import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
+import uk.ac.rdg.resc.edal.wms.util.StyleDef;
 
 import com.jogamp.opengl.util.texture.TextureData;
 import com.jogamp.opengl.util.texture.TextureIO;
 import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 
 public class EdalGridDataLayer {
+    public static final int LEGEND_WIDTH = 20;
 
     final String layerName;
     private VideoWallCatalogue catalogue;
@@ -93,7 +94,14 @@ public class EdalGridDataLayer {
     private DateTime time;
     private TimeAxis tAxis;
     private GridVariableMetadata metadata;
+
     private Extent<Float> scaleRange;
+    private String palette;
+    private boolean logScale;
+    private int numColorBands;
+    private Color bgColor;
+    private Color underColor;
+    private Color overColor;
 
     private ExecutorService threadPool;
     private TimeCacher timeCacheTask = null;
@@ -105,8 +113,6 @@ public class EdalGridDataLayer {
         this.catalogue = catalogue;
         this.layerList = layerList;
         this.wwd = wwd;
-
-        scaleRange = catalogue.getRangeForLayer(layerName);
 
         VariableMetadata m = catalogue.getVariableMetadataForLayer(layerName);
         if (!(m instanceof GridVariableMetadata)) {
@@ -127,13 +133,37 @@ public class EdalGridDataLayer {
 
         threadPool = Executors.newFixedThreadPool(2);
 
+        WmsLayerMetadata layerMetadata = catalogue.getLayerMetadata(layerName);
+        scaleRange = layerMetadata.getColorScaleRange();
+        palette = layerMetadata.getPalette();
+        logScale = layerMetadata.isLogScaling();
+        numColorBands = layerMetadata.getNumColorBands();
+        bgColor = new Color(0, true);
+        underColor = Color.black;
+        overColor = Color.black;
+
         cacheFromCurrent();
 
         drawLayer();
     }
 
     public void destroy() {
+        /*
+         * Remove the data layer
+         */
         layerList.remove(dataLayer);
+
+        /*
+         * Stop any caching
+         */
+        if (timeCacheTask != null) {
+            timeCacheTask.stopCaching();
+        }
+        if (elevationCacheTask != null) {
+            elevationCacheTask.stopCaching();
+        }
+
+        threadPool.shutdown();
     }
 
     public void setElevation(Double elevation) {
@@ -160,16 +190,22 @@ public class EdalGridDataLayer {
     }
 
     public BufferedImage getLegend(int size) {
+        return getLegend(size, false);
+    }
+
+    public BufferedImage getLegend(int size, boolean labels) {
         if (dataLayer != null) {
             try {
-                return dataLayer.mapImage.getLegend(size, Color.lightGray, new Color(0, true),
-                        false, 20);
+                return dataLayer.mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0, 150),
+                        labels, LEGEND_WIDTH);
             } catch (EdalException e) {
                 /*
                  * TODO log properly
                  */
                 e.printStackTrace();
             }
+        } else {
+            System.out.println("can't get legend, datalayer is null!");
         }
         return null;
     }
@@ -178,7 +214,8 @@ public class EdalGridDataLayer {
         if (dataLayer != null) {
             layerList.remove(dataLayer);
         }
-        dataLayer = new EdalGridData(elevation, time, scaleRange);
+        dataLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale, numColorBands,
+                bgColor, underColor, overColor);
         layerList.add(dataLayer);
         wwd.redraw();
     }
@@ -223,8 +260,9 @@ public class EdalGridDataLayer {
         }
     }
 
-    private void cacheEdalGrid(Double elevation, DateTime time, Extent<Float> scaleRange) {
-        EdalGridData cacheLayer = new EdalGridData(elevation, time, scaleRange);
+    private void cacheEdalGrid(Double elevation, DateTime time) {
+        EdalGridData cacheLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale,
+                numColorBands, bgColor, underColor, overColor);
         Map<TileKey, TextureData> cacheData = new HashMap<TileKey, TextureData>();
         GpuResourceCache gpuResourceCache = wwd.getGpuResourceCache();
         /*
@@ -259,17 +297,31 @@ public class EdalGridDataLayer {
         private Double elevation;
         private DateTime time;
 
-        public EdalGridData(Double elevation, DateTime time, Extent<Float> scaleRange) {
+        public EdalGridData(Double elevation, DateTime time, String palette,
+                Extent<Float> scaleRange, boolean logScale, int numColorBands, Color bgColor,
+                Color underColor, Color overColor) {
             super(makeLevelSet(layerName, elevation, time));
             this.elevation = elevation;
             this.time = time;
 
-            ColourScheme colourScheme = new SegmentColourScheme(new ColourScale(
-                    scaleRange.getLow(), scaleRange.getHigh(), false), Color.black, Color.black,
-                    new Color(0, true), "rainbow", 100);
-            RasterLayer rasterLayer = new RasterLayer(layerName, colourScheme);
-            mapImage = new MapImage();
-            mapImage.getLayers().add(rasterLayer);
+            try {
+                List<StyleDef> supportedStyles = catalogue.getSupportedStyles(catalogue
+                        .getVariableMetadataForLayer(layerName));
+                String plotStyleName = null;
+                for (StyleDef style : supportedStyles) {
+                    if (style.getStyleName().startsWith("default")) {
+                        plotStyleName = style.getStyleName();
+                    }
+                }
+                if (plotStyleName == null) {
+                    throw new EdalException("No default style defined for this layer");
+                }
+                mapImage = GetMapStyleParams.getMapImageFromStyleNameAndParams(catalogue,
+                        layerName, plotStyleName, palette, scaleRange, logScale, numColorBands,
+                        bgColor, underColor, overColor);
+            } catch (EdalException e) {
+                e.printStackTrace();
+            }
 
             setName(layerName);
             setUseTransparentTextures(true);
@@ -487,19 +539,19 @@ public class EdalGridDataLayer {
                 if (stop) {
                     return;
                 }
-                cacheEdalGrid(elevation, tAxis.getCoordinateValue(i), scaleRange);
+                cacheEdalGrid(elevation, tAxis.getCoordinateValue(i));
             }
             for (int i = timeIndex - 1; i >= 0; i--) {
                 if (stop) {
                     return;
                 }
-                cacheEdalGrid(elevation, tAxis.getCoordinateValue(i), scaleRange);
+                cacheEdalGrid(elevation, tAxis.getCoordinateValue(i));
             }
             /*
              * TODO This would be a useful debug statement in the logging
              */
-//            System.out.println("cached times for layer: " + layerName + " at elevation "
-//                    + elevation);
+            //            System.out.println("cached times for layer: " + layerName + " at elevation "
+            //                    + elevation);
         }
 
         public void stopCaching() {
@@ -525,18 +577,18 @@ public class EdalGridDataLayer {
                 if (stop) {
                     return;
                 }
-                cacheEdalGrid(zAxis.getCoordinateValue(i), time, scaleRange);
+                cacheEdalGrid(zAxis.getCoordinateValue(i), time);
             }
             for (int i = zIndex - 1; i >= 0; i--) {
                 if (stop) {
                     return;
                 }
-                cacheEdalGrid(zAxis.getCoordinateValue(i), time, scaleRange);
+                cacheEdalGrid(zAxis.getCoordinateValue(i), time);
             }
             /*
              * TODO This would be a useful debug statement in the logging
              */
-//            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
+            //            System.out.println("cached elevations for layer: " + layerName + " at time " + time);
         }
 
         public void stopCaching() {

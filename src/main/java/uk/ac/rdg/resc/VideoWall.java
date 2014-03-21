@@ -41,21 +41,24 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.xml.bind.JAXBException;
 
+import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
+import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 
 @SuppressWarnings("serial")
 public class VideoWall extends JFrame {
     private VideoWallCatalogue datasetLoader;
     private MultiGlobeFrame globePanels;
-//    private RescControlPanel controlPanel;
+    //    private RescControlPanel controlPanel;
     private JPanel addRemoveRowPanel;
     private JPanel addRemoveColumnPanel;
-    
+
     public VideoWall() throws IOException, EdalException, JAXBException {
-        
+        DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
+
         datasetLoader = new VideoWallCatalogue();
         globePanels = new MultiGlobeFrame(datasetLoader);
-        
+
         addRemoveRowPanel = new JPanel();
         Button addRowButton = new Button("+");
         addRowButton.addActionListener(new ActionListener() {
@@ -79,7 +82,7 @@ public class VideoWall extends JFrame {
         addRemoveRowPanel.setLayout(new BoxLayout(addRemoveRowPanel, BoxLayout.PAGE_AXIS));
         addRemoveRowPanel.add(removeRowButton);
         addRemoveRowPanel.add(addRowButton);
-        
+
         addRemoveColumnPanel = new JPanel();
         Button addColumnButton = new Button("+");
         addColumnButton.addActionListener(new ActionListener() {
@@ -100,20 +103,19 @@ public class VideoWall extends JFrame {
         removeColumnButton.setBackground(Color.black);
         removeColumnButton.setForeground(Color.lightGray);
         addRemoveColumnPanel.setLayout(new BoxLayout(addRemoveColumnPanel, BoxLayout.LINE_AXIS));
-        
+
         addRemoveColumnPanel.add(removeColumnButton);
         addRemoveColumnPanel.add(addColumnButton);
-        
-        
+
         setLayout(new BorderLayout());
         add(globePanels, BorderLayout.CENTER);
         add(addRemoveColumnPanel, BorderLayout.EAST);
         add(addRemoveRowPanel, BorderLayout.SOUTH);
-        
-//        controlPanel = new RescControlPanel(this, globePanels);
-//        add(controlPanel, BorderLayout.WEST);
+
+        //        controlPanel = new RescControlPanel(this, globePanels);
+        //        add(controlPanel, BorderLayout.WEST);
     }
-    
+
     public static void main(String[] args) {
         System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
         java.awt.EventQueue.invokeLater(new Runnable() {

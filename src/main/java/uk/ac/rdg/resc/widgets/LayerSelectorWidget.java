@@ -26,7 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-package uk.ac.rdg.resc;
+package uk.ac.rdg.resc.widgets;
 
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.event.SelectEvent;
@@ -46,10 +46,10 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Insets;
 import java.awt.Point;
-import java.awt.Rectangle;
 import java.util.HashMap;
 import java.util.Map;
 
+import uk.ac.rdg.resc.RescWorldWindow;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 
 /**
@@ -245,6 +245,7 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
             } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
                 if (pickableItems.containsKey(pickedObj) || pickedObj == backButton) {
                     ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
+                    event.consume();
                 } else {
                     ((Component) wwd).setCursor(Cursor.getDefaultCursor());
                 }

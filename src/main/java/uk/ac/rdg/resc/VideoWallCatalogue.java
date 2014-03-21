@@ -46,7 +46,6 @@ import uk.ac.rdg.resc.edal.dataset.Dataset;
 import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
 import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.domain.Extent;
-import uk.ac.rdg.resc.edal.exceptions.DataReadingException;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
 import uk.ac.rdg.resc.edal.feature.GridFeature;
@@ -56,6 +55,7 @@ import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
 import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
+import uk.ac.rdg.resc.edal.ncwms.NcwmsCatalogue;
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsConfig;
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsConfig.DatasetStorage;
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
@@ -63,38 +63,39 @@ import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.util.CollectionUtils;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
+import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
 import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
+import uk.ac.rdg.resc.edal.wms.util.ContactInfo;
+import uk.ac.rdg.resc.edal.wms.util.ServerInfo;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 
-public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
-    private NcwmsConfig config;
-    private Map<String, Dataset> datasets;
-    private Map<String, NcwmsVariable> variables;
-    private ActiveLayerMenuItem rootMenuNode = null;
+public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage, FeatureCatalogue {
+//    private NcwmsConfig config;
+//    private Map<String, Dataset> datasets;
+//    private Map<String, NcwmsVariable> variables;
+    private final LayerMenuItem rootMenuNode;
 
     private Map<String, GridFeature> gridFeatures;
 
     public VideoWallCatalogue() throws IOException, JAXBException {
-        DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
+        super(NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml")));
+        
+//        config = NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml"));
+//        config.setDatasetLoadedHandler(this);
+//        config.loadDatasets();
 
-        config = NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml"));
-        config.setDatasetLoadedHandler(this);
-        config.loadDatasets();
-
-        datasets = new HashMap<>();
-        variables = new HashMap<>();
+//        datasets = new HashMap<>();
+//        variables = new HashMap<>();
         gridFeatures = new HashMap<>();
 
-        rootMenuNode = new ActiveLayerMenuItem("Datasets", "root", false, false);
+        rootMenuNode = new LayerMenuItem("Datasets", "root", false);
     }
 
     @Override
     public void datasetLoaded(Dataset dataset, Collection<NcwmsVariable> variables) {
-        datasets.put(dataset.getId(), dataset);
+        super.datasetLoaded(dataset, variables);
+        
         for (NcwmsVariable variable : variables) {
-            String layerName = getLayerName(dataset.getId(), variable.getId());
-            this.variables.put(layerName, variable);
-            
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
                     .getMapFeatureType(variable.getId());
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
@@ -216,21 +217,13 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         }
     }
 
-    public Extent<Float> getRangeForLayer(String layerName) throws EdalException {
-        if (!variables.containsKey(layerName)) {
-            throw new EdalException("Layer " + layerName
-                    + " is not present or has not been loaded yet");
-        }
-        return variables.get(layerName).getColorScaleRange();
-    }
-
-    public ActiveLayerMenuItem getEdalLayers() {
+    public LayerMenuItem getEdalLayers() {
         return rootMenuNode;
     }
 
     private void addDatasetToMenu(Dataset dataset) {
-        ActiveLayerMenuItem datasetNode = new ActiveLayerMenuItem(config.getDatasetInfo(
-                dataset.getId()).getTitle(), dataset.getId(), false, false);
+        LayerMenuItem datasetNode = new LayerMenuItem(config.getDatasetInfo(
+                dataset.getId()).getTitle(), dataset.getId(), false);
         Set<VariableMetadata> variables = dataset.getTopLevelVariables();
         for (VariableMetadata variable : variables) {
             LayerMenuItem child = createMenuNode(variable);
@@ -239,19 +232,20 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         rootMenuNode.addChildItem(datasetNode);
     }
 
-    private ActiveLayerMenuItem createMenuNode(VariableMetadata metadata) {
+    private LayerMenuItem createMenuNode(VariableMetadata metadata) {
         String layerId = getLayerName(metadata);
-        ActiveLayerMenuItem variableNode = new ActiveLayerMenuItem(variables.get(layerId)
-                .getTitle(), layerId, true, false);
+        LayerMenuItem variableNode = new LayerMenuItem(layerMetadata.get(layerId)
+                .getTitle(), layerId, true);
         Set<VariableMetadata> variables = metadata.getChildren();
         for (VariableMetadata variable : variables) {
-            ActiveLayerMenuItem child = createMenuNode(variable);
+            LayerMenuItem child = createMenuNode(variable);
             variableNode.addChildItem(child);
         }
         return variableNode;
     }
 
-    private Dataset getDatasetFromLayerName(String layerName) throws WmsLayerNotFoundException {
+    @Override
+    public Dataset getDatasetFromLayerName(String layerName) throws WmsLayerNotFoundException {
         String[] layerParts = layerName.split("/");
         if (layerParts.length != 2) {
             throw new WmsLayerNotFoundException(
@@ -273,7 +267,8 @@ public class VideoWallCatalogue implements DatasetStorage, FeatureCatalogue {
         return getLayerName(metadata.getDataset().getId(), metadata.getId());
     }
 
-    private String getLayerName(String datasetId, String variableId) {
+    @Override
+    public String getLayerName(String datasetId, String variableId) {
         return datasetId + "/" + variableId;
     }
 }

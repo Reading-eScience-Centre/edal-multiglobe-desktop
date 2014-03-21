@@ -26,7 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-package uk.ac.rdg.resc;
+package uk.ac.rdg.resc.widgets;
 
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.render.Annotation;
@@ -43,7 +43,8 @@ import java.awt.Rectangle;
 import java.util.HashSet;
 import java.util.Set;
 
-import uk.ac.rdg.resc.SliderWidget.SliderWidgetHandler;
+import uk.ac.rdg.resc.RescWorldWindow;
+import uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler;
 
 /**
  * Encapsulates a {@link SliderWidget} and provides layout management and (TODO)

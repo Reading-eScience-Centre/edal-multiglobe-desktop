@@ -26,7 +26,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-package uk.ac.rdg.resc;
+package uk.ac.rdg.resc.widgets;
 
 import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.avlist.AVKey;
@@ -52,6 +52,8 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.net.URL;
 import java.text.DecimalFormat;
+
+import uk.ac.rdg.resc.RescWorldWindow;
 
 public class FeatureInfoBalloon extends DialogAnnotation implements SelectListener {
     private static final DecimalFormat NUMBER_3DP = new DecimalFormat("#0.000");
@@ -216,6 +218,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
             } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
                 if (selectObj == profileGraph || selectObj == timeseriesGraph) {
                     ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
+                    event.consume();
                 } else {
                     ((Component) wwd).setCursor(Cursor.getDefaultCursor());
                 }
