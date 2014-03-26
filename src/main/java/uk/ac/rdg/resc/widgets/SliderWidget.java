@@ -51,6 +51,9 @@ import java.nio.DoubleBuffer;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2;
 
+import uk.ac.rdg.resc.edal.domain.Extent;
+import uk.ac.rdg.resc.edal.util.Extents;
+
 /**
  * A {@link ScreenAnnotation} which allows users to slide the bar and add a
  * handler to detect sliding events.
@@ -58,12 +61,17 @@ import javax.media.opengl.GL2;
  * The initial implementation was strongly based on {@link ProgressAnnotation}
  */
 public class SliderWidget extends ScreenAnnotation implements SelectListener {
+    /*
+     * These should be divisible by 2
+     */
     private static final int CIRCLE_SIZE = 32;
+    private static final int CENTRE_SIZE = 8;
 
     final String id;
 
     private boolean reversed = false;
     protected double value;
+    protected double valueRange;
     protected double min;
     protected double max;
     protected Color backgroundColor;
@@ -71,14 +79,17 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     protected Insets interiorInsets;
 
     //    private boolean highlighted = false;
-//    private Color highlightColor;
+    //    private Color highlightColor;
 
     private String orientation;
     SliderWidgetHandler handler;
     private Point lastDragPoint = null;
-    
-    private DoubleBuffer circleElementBuffer;
-    
+    private Point lastRightDragPoint = null;
+
+    private DoubleBuffer elementBuffer;
+    private DoubleBuffer centreElementBuffer;
+    //    private boolean recalculateElementBuffer = false;
+
     private Thread sliderTimer = null;
 
     public SliderWidget(String id, String orientation, double value, double min, double max,
@@ -97,10 +108,11 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         this.min = min;
         this.max = max;
 
+        this.valueRange = 0.0;
+
         this.handler = handler;
 
         this.backgroundColor = new Color(60, 60, 60, 128);
-//        this.highlightColor = new Color(120, 120, 120, 196);
         this.elementColor = new Color(171, 171, 171, 196);
         this.interiorInsets = new Insets(2, 2, 2, 2);
 
@@ -127,8 +139,10 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             sliderAttributes.setSize(new Dimension(10, 400));
         }
 
-        circleElementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_ELLIPSE, CIRCLE_SIZE,
+        elementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_ELLIPSE, CIRCLE_SIZE,
                 CIRCLE_SIZE, 0, null);
+        centreElementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_ELLIPSE, CENTRE_SIZE,
+                CENTRE_SIZE, 0, null);
 
         wwd.addSelectListener(this);
     }
@@ -148,6 +162,21 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             value = max;
         }
         this.value = value;
+    }
+
+    public Extent<Double> getValueRange() {
+        return Extents.newExtent(value - valueRange, value + valueRange);
+    }
+
+    public void setValueRange(double valueRange) {
+        if (valueRange < 0.0) {
+            valueRange = 0;
+        } else if (valueRange > (max - min)) {
+            valueRange = (max - min);
+        }
+        this.valueRange = valueRange;
+        //        recalculateElementBuffer = true;
+        setValue(value);
     }
 
     public void setMin(double min) {
@@ -242,25 +271,99 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
 
     protected void drawSliderElement(DrawContext dc, int width, int height, double opacity,
             Position pickPosition) {
-        Point location = computeSliderLocation(width, height);
+        Rectangle location = computeSliderLocation(width, height);
 
         applyColor(dc, elementColor, opacity, true);
         dc.getGL().getGL2().glTranslated(location.x, location.y, 0);
-        FrameFactory.drawBuffer(dc, GL.GL_TRIANGLE_FAN, circleElementBuffer);
+        //        if (recalculateElementBuffer) {
+        recalculateElementBuffer(width, height);
+        //            recalculateElementBuffer = false;
+        //        }
+        FrameFactory.drawBuffer(dc, GL.GL_TRIANGLE_FAN, elementBuffer);
+        dc.getGL()
+                .getGL2()
+                .glTranslated(location.width + (CIRCLE_SIZE - CENTRE_SIZE) / 2,
+                        location.height + (CIRCLE_SIZE - CENTRE_SIZE) / 2, 0);
+        FrameFactory.drawBuffer(dc, GL.GL_TRIANGLE_FAN, centreElementBuffer);
     }
 
-    protected Point computeSliderLocation(int width, int height) {
-        Rectangle containerBounds = computeInsetBounds(width, height);
+    private void recalculateElementBuffer(int width, int height) {
+        double valueMin = value - valueRange;
+        double valueMax = value + valueRange;
+        if (valueMin < this.min) {
+            valueMin = this.min;
+        }
+        if (valueMax > this.max) {
+            valueMax = this.max;
+        }
         if (orientation.equals(AVKey.HORIZONTAL)) {
-            return new Point(computeSliderRelativePos(containerBounds.width) - CIRCLE_SIZE / 2,
-                    containerBounds.y + containerBounds.height / 2 - CIRCLE_SIZE / 2);
+            int min = computeSliderRelativePos(width, valueMin) - CIRCLE_SIZE / 2;
+            int max = computeSliderRelativePos(width, valueMax) - CIRCLE_SIZE / 2;
+            if (!reversed) {
+                elementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_RECTANGLE, max - min
+                        + CIRCLE_SIZE, CIRCLE_SIZE, CIRCLE_SIZE / 2, null);
+            } else {
+                elementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_RECTANGLE, min - max
+                        + CIRCLE_SIZE, CIRCLE_SIZE, CIRCLE_SIZE / 2, null);
+            }
         } else {
-            return new Point(containerBounds.x + containerBounds.width / 2 - CIRCLE_SIZE / 2,
-                    computeSliderRelativePos(containerBounds.height) - CIRCLE_SIZE / 2);
+            int min = computeSliderRelativePos(height, valueMin) - CIRCLE_SIZE / 2;
+            int max = computeSliderRelativePos(height, valueMax) - CIRCLE_SIZE / 2;
+            if (!reversed) {
+                elementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_RECTANGLE, CIRCLE_SIZE,
+                        max - min + CIRCLE_SIZE, CIRCLE_SIZE / 2, null);
+            } else {
+                elementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_RECTANGLE, CIRCLE_SIZE,
+                        min - max + CIRCLE_SIZE, CIRCLE_SIZE / 2, null);
+
+            }
         }
     }
 
-    protected int computeSliderRelativePos(int barSize) {
+    /**
+     * This method uses
+     * 
+     * @param width
+     * @param height
+     * @return
+     */
+    protected Rectangle computeSliderLocation(int width, int height) {
+        double valueMin = value - valueRange;
+        double valueMax = value + valueRange;
+        if (valueMin < this.min) {
+            valueMin = this.min;
+        }
+        if (valueMax > this.max) {
+            valueMax = this.max;
+        }
+        Rectangle containerBounds = computeInsetBounds(width, height);
+        if (orientation == AVKey.HORIZONTAL) {
+            int y = containerBounds.y + containerBounds.height / 2 - CIRCLE_SIZE / 2;
+            if (!reversed) {
+                int xMin = computeSliderRelativePos(containerBounds.width, valueMin) - CIRCLE_SIZE
+                        / 2;
+                int xMax = computeSliderRelativePos(containerBounds.width, value) - CIRCLE_SIZE / 2;
+                return new Rectangle(xMin, y, xMax - xMin, 0);
+            } else {
+                int xMin = computeSliderRelativePos(containerBounds.width, value) - CIRCLE_SIZE / 2;
+                int xMax = computeSliderRelativePos(containerBounds.width, valueMax) - CIRCLE_SIZE
+                        / 2;
+                return new Rectangle(xMax, y, xMin - xMax, 0);
+            }
+        } else {
+            int x = containerBounds.x + containerBounds.width / 2 - CIRCLE_SIZE / 2;
+            int yMax = computeSliderRelativePos(containerBounds.height, value) - CIRCLE_SIZE / 2;
+            int yMin;
+            if (!reversed) {
+                yMin = computeSliderRelativePos(containerBounds.height, valueMin) - CIRCLE_SIZE / 2;
+            } else {
+                yMin = computeSliderRelativePos(containerBounds.height, valueMax) - CIRCLE_SIZE / 2;
+            }
+            return new Rectangle(x, yMin, 0, yMax - yMin);
+        }
+    }
+
+    protected int computeSliderRelativePos(int barSize, double value) {
         double factor = (value - min) / (max - min);
         if (reversed) {
             return (int) ((1.0 - factor) * barSize);
@@ -278,7 +381,6 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                     lastDragPoint = event.getPickPoint();
                 }
                 if (event.isDrag()) {
-                    //                    highlighted = true;
                     Point point = event.getMouseEvent().getPoint();
                     double percMove;
                     if (orientation.equals(AVKey.HORIZONTAL)) {
@@ -290,17 +392,30 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                     }
                     double valueDiff = percMove * (max - min);
 
-                    double value;
-                    if (reversed) {
-                        value = getValue() - valueDiff;
+                    if (!event.getMouseEvent().isShiftDown()) {
+                        /*
+                         * Normal drag - move the slider
+                         */
+                        double value;
+                        if (reversed) {
+                            value = getValue() - valueDiff;
+                        } else {
+                            value = getValue() + valueDiff;
+                        }
+                        lastDragPoint = point;
+                        setValue(value);
                     } else {
-                        value = getValue() + valueDiff;
+                        /*
+                         * Shift-drag - we want to change slider range
+                         */
+                        double valueRange;
+                        valueRange = this.valueRange + valueDiff;
+                        setValueRange(valueRange);
                     }
                     lastDragPoint = point;
-                    setValue(value);
                     if (handler != null) {
                         resetSliderTimer();
-                        handler.sliderChanged(id, this.value);
+                        handler.sliderChanged(id, getValue(), getValueRange());
                         sliderTimer.start();
                     }
                     event.getMouseEvent().consume();
@@ -308,7 +423,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             }
         }
     }
-    
+
     private void resetSliderTimer() {
         if (sliderTimer != null) {
             sliderTimer.interrupt();
@@ -321,8 +436,8 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                  */
                 try {
                     Thread.sleep(500L);
-                    if(handler != null) {
-                        handler.sliderSettled();
+                    if (handler != null) {
+                        handler.sliderSettled(id);
                     }
                 } catch (InterruptedException e) {
                     /*
@@ -334,7 +449,6 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         });
     }
 
-
     public interface SliderWidgetHandler {
         /**
          * Gets called when the value of the slider changes
@@ -344,7 +458,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
          * @param value
          *            The double value which the slider has changed to
          */
-        public void sliderChanged(String id, double value);
+        public void sliderChanged(String id, double value, Extent<Double> valueRange);
 
         /**
          * Formats a slider value as text
@@ -356,10 +470,13 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
          * @return A formatted string representing the slider's value
          */
         public String formatSliderValue(String id, double value);
-        
+
         /**
          * Called once a slider has stopped moving for 500ms
+         * 
+         * @param id
+         *            The ID of the slider which has stopped moving
          */
-        public void sliderSettled();
+        public void sliderSettled(String id);
     }
 }

@@ -44,6 +44,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import uk.ac.rdg.resc.RescWorldWindow;
+import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler;
 
 /**
@@ -88,22 +89,25 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
         
         sliderWidget = new SliderWidget(id, orientation, min, min, max, new SliderWidgetHandler() {
             @Override
-            public void sliderChanged(String id, double value) {
+            public void sliderChanged(String id, double value, Extent<Double> valueRange) {
                 /*
                  * Update the value label, then pass the change event onto other
                  * listeners
                  */
-                label.setText(formatSliderValue(id, value));
-                label.getAttributes().setVisible(true);
+                String sliderText = formatSliderValue(id, value);
+                if(sliderText != null) {
+                    label.setText(sliderText);
+                    label.getAttributes().setVisible(true);
+                }
                 if (handler != null) {
-                    handler.sliderChanged(id, value);
+                    handler.sliderChanged(id, value, valueRange);
                 }
                 for(SliderWidgetAnnotation linked : linkedSliders) {
                     linked.sliderWidget.setValue(value);
                     linked.label.setText(formatSliderValue(id, value));
                     linked.label.getAttributes().setVisible(true);
                     if (linked.handler != null) {
-                        linked.handler.sliderChanged(id, value);
+                        linked.handler.sliderChanged(id, value, valueRange);
                     }
                 }
             }
@@ -117,7 +121,7 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
             }
 
             @Override
-            public void sliderSettled() {
+            public void sliderSettled(String id) {
                 label.getAttributes().setVisible(false);
                 wwd.redraw();
                 for(SliderWidgetAnnotation linked : linkedSliders) {
@@ -125,11 +129,11 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
                     linked.wwd.redraw();
                 }
                 if(handler != null) {
-                    handler.sliderSettled();
+                    handler.sliderSettled(id);
                 }
                 for(SliderWidgetAnnotation linked : linkedSliders) {
                     if(linked.handler != null) {
-                        linked.handler.sliderSettled();
+                        linked.handler.sliderSettled(id);
                     }
                 }
             }
@@ -174,6 +178,10 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
 
     public double getSliderValue() {
         return sliderWidget.value;
+    }
+    
+    public Extent<Double> getSliderRange() {
+        return sliderWidget.getValueRange();
     }
 
     @Override

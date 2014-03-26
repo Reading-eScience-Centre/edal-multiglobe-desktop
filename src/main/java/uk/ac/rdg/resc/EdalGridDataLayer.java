@@ -33,6 +33,8 @@ import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.avlist.AVList;
 import gov.nasa.worldwind.avlist.AVListImpl;
 import gov.nasa.worldwind.cache.GpuResourceCache;
+import gov.nasa.worldwind.event.SelectEvent;
+import gov.nasa.worldwind.event.SelectListener;
 import gov.nasa.worldwind.geom.Angle;
 import gov.nasa.worldwind.geom.LatLon;
 import gov.nasa.worldwind.geom.Sector;
@@ -80,7 +82,7 @@ import com.jogamp.opengl.util.texture.TextureData;
 import com.jogamp.opengl.util.texture.TextureIO;
 import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 
-public class EdalGridDataLayer {
+public class EdalGridDataLayer implements EdalDataLayer {
     public static final int LEGEND_WIDTH = 20;
 
     final String layerName;
@@ -147,6 +149,7 @@ public class EdalGridDataLayer {
         drawLayer();
     }
 
+    @Override
     public void destroy() {
         /*
          * Remove the data layer
@@ -166,33 +169,40 @@ public class EdalGridDataLayer {
         threadPool.shutdown();
     }
 
-    public void setElevation(Double elevation) {
+    @Override
+    public void setElevation(Double elevation, Extent<Double> elevationRange) {
         int zIndex = zAxis.findIndexOf(elevation);
         this.elevation = zAxis.getCoordinateValue(zIndex);
         drawLayer();
     }
 
+    @Override
     public Double getElevation() {
         return this.elevation;
     }
 
-    public void setTime(DateTime time) {
+    @Override
+    public void setTime(DateTime time, Extent<DateTime> timeRange) {
         this.time = GISUtils.getClosestTimeTo(time, tAxis);
         drawLayer();
     }
 
+    @Override
     public DateTime getTime() {
         return this.time;
     }
 
+    @Override
     public GridVariableMetadata getLayerMetadata() {
         return metadata;
     }
 
+    @Override
     public BufferedImage getLegend(int size) {
         return getLegend(size, false);
     }
 
+    @Override
     public BufferedImage getLegend(int size, boolean labels) {
         if (dataLayer != null) {
             try {
@@ -292,7 +302,17 @@ public class EdalGridDataLayer {
         context.release();
     }
 
-    public class EdalGridData extends TiledImageLayer {
+    /**
+     * A {@link TiledImageLayer} which creates tiles on-the-fly when they are
+     * required.
+     * 
+     * This has its own copy of elevation and time. It is a nested class, and
+     * could use the values from the parent {@link EdalGridDataLayer}, but this
+     * would not allow us to use {@link EdalGridData} to precache layers.
+     * 
+     * @author Guy
+     */
+    public class EdalGridData extends TiledImageLayer implements SelectListener {
         private MapImage mapImage;
         private Double elevation;
         private DateTime time;
@@ -326,6 +346,7 @@ public class EdalGridDataLayer {
             setName(layerName);
             setUseTransparentTextures(true);
             setPickEnabled(true);
+            wwd.addSelectListener(this);
 
             setForceLevelZeroLoads(true);
             setRetainLevelZeroTiles(true);
@@ -479,6 +500,13 @@ public class EdalGridDataLayer {
             @Override
             public String toString() {
                 return this.tile.toString();
+            }
+        }
+
+        @Override
+        public void selected(SelectEvent event) {
+            if (event.getTopObject() == this) {
+                System.out.println("data layer clicked");
             }
         }
     }

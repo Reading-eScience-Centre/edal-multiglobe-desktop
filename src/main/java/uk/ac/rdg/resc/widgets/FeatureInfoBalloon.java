@@ -205,6 +205,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                      * displayed
                      */
                     parent.removeAnnotation(FeatureInfoBalloon.this);
+                    getAttributes().setVisible(false);
                     wwd.removeSelectListener(this);
                 } else if (selectObj == profileGraph) {
                     addFullScreenAnnotation(profileFullPath);

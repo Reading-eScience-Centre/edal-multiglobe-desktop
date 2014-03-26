@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import uk.ac.rdg.resc.RescWorldWindow;
+import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 
 /**
@@ -168,7 +169,7 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
                 pickableItems.put(menuItem, new Runnable() {
                     @Override
                     public void run() {
-                        plot(item.getId());
+                        showLayer(item.getId());
                     }
                 });
 
@@ -212,9 +213,19 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
         }
     }
 
-    private void plot(String layer) {
+    private void showLayer(String layer) {
         if (wwd != null && wwd.getModel() != null) {
-            wwd.getModel().setDataLayer(layer);
+            try {
+                wwd.getModel().setDataLayer(layer);
+            } catch (WmsLayerNotFoundException e) {
+                /*
+                 * TODO Log this. The layer has not been found. We can't do
+                 * anything about this, but it shouldn't happen in normal
+                 * operation (where did the user get the layer ID from?)
+                 */
+                e.printStackTrace();
+                return;
+            }
         }
         getAttributes().setVisible(false);
     }

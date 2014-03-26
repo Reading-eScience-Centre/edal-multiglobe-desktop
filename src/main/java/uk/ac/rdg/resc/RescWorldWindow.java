@@ -28,11 +28,15 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.avlist.AVKey;
+import gov.nasa.worldwind.awt.AWTInputHandler;
 import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
 import gov.nasa.worldwind.geom.Position;
 
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+
+import uk.ac.rdg.resc.input.RescInputHandler;
 
 @SuppressWarnings("serial")
 public class RescWorldWindow extends WorldWindowGLCanvas {
@@ -72,6 +76,12 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
             public void mouseEntered(MouseEvent e) {
             }
         });
+        
+//        ((AWTInputHandler) getInputHandler()).getEventSource().getSceneController().removePropertyChangeListener(AVKey.VIEW,((AWTInputHandler) getInputHandler()));
+        RescInputHandler rescInputHandler = new RescInputHandler();
+//        getSceneController().addPropertyChangeListener(AVKey.VIEW, rescInputHandler);
+        rescInputHandler.setEventSource(this);
+        setInputHandler(rescInputHandler);
     }
 
     public LinkedView getLinkedView() {
