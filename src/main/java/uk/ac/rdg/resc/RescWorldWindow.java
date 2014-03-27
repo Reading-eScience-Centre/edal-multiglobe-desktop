@@ -28,8 +28,6 @@
 
 package uk.ac.rdg.resc;
 
-import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.awt.AWTInputHandler;
 import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
 import gov.nasa.worldwind.geom.Position;
 
@@ -44,6 +42,16 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
 
     public RescWorldWindow(LinkedView linkedView) {
         super();
+
+        /*
+         * We must set this prior to adding the mouse listener, otherwise there
+         * are problems with the FeatureInfoBalloon behaviour (a new
+         * mouseClicked event gets created in the previous position when we
+         * click close - so a feature balloon can never be removed...)
+         */
+        RescInputHandler rescInputHandler = new RescInputHandler();
+        rescInputHandler.setEventSource(this);
+        setInputHandler(rescInputHandler);
 
         this.linkedView = linkedView;
         setView(this.linkedView);
@@ -76,12 +84,6 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
             public void mouseEntered(MouseEvent e) {
             }
         });
-        
-//        ((AWTInputHandler) getInputHandler()).getEventSource().getSceneController().removePropertyChangeListener(AVKey.VIEW,((AWTInputHandler) getInputHandler()));
-        RescInputHandler rescInputHandler = new RescInputHandler();
-//        getSceneController().addPropertyChangeListener(AVKey.VIEW, rescInputHandler);
-        rescInputHandler.setEventSource(this);
-        setInputHandler(rescInputHandler);
     }
 
     public LinkedView getLinkedView() {

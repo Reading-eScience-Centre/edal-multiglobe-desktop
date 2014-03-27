@@ -34,11 +34,11 @@
     <Layer className="gov.nasa.worldwind.layers.Earth.CountryBoundariesLayer" actuate="onRequest"/>
     <Layer href="config/Earth/OpenStreetMap.xml" actuate="onRequest"/>
     <Layer href="config/Earth/EarthAtNightLayer.xml" actuate="onRequest"/>
-<!--     <Layer className="gov.nasa.worldwind.layers.Earth.NASAWFSPlaceNameLayer"/> -->
-<!--     <Layer className="gov.nasa.worldwind.layers.WorldMapLayer"/> -->
     <Layer className="gov.nasa.worldwind.layers.ScalebarLayer">
         <Property name="Position" value="gov.nasa.worldwind.layers.ViewControlsLayer.NorthEast"/>
     </Layer>
+<!--     <Layer className="gov.nasa.worldwind.layers.Earth.NASAWFSPlaceNameLayer"/> -->
+<!--     <Layer className="gov.nasa.worldwind.layers.WorldMapLayer"/> -->
 <!--     <Layer className="gov.nasa.worldwind.layers.Earth.CountryBoundariesLayer" actuate="onLoad"/> -->
 <!--     <Layer className="gov.nasa.worldwind.layers.CompassLayer"/> -->
 </LayerList>

@@ -41,7 +41,6 @@ import java.awt.Point;
 import java.awt.Rectangle;
 
 import uk.ac.rdg.resc.LinkedView.LinkedViewState;
-import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 import uk.ac.rdg.resc.widgets.LayerSelectorWidget;
 
 /**
@@ -51,7 +50,7 @@ import uk.ac.rdg.resc.widgets.LayerSelectorWidget;
  * @author Guy
  */
 public class EdalConfigLayer extends RenderableLayer implements SelectListener {
-    private final static String CONFIG_BUTTON = "images/config_button.png";
+//    private final static String CONFIG_BUTTON = "images/config_button.png";
     private final static String LAYERS_BUTTON = "images/layers_button.png";
     private final static String LINK_BUTTON = "images/link_button.png";
     private final static String UNLINK_BUTTON = "images/unlink_button.png";

@@ -49,7 +49,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -115,8 +114,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
     private int lastViewportHeight = -1;
 
     private RescWorldWindow wwd;
-
-    private List<RescModel> timeLinkedModels = new ArrayList<>();
 
     /*
      * Keep a reference to the current feature info balloon so that we can close
@@ -343,15 +340,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
             timeSlider.setSliderValue(edalDataLayer.getTime().getMillis());
 
             List<RescModel> allModels = parent.getAllModels();
-            timeLinkedModels.clear();
-            timeLinkedModels.add(this);
             for (RescModel model : allModels) {
                 if (model != this && model.timeSlider != null
                         && model.timeSlider.equalLimits(timeSlider)) {
-                    timeLinkedModels.add(model);
-                    if (!model.timeLinkedModels.contains(this)) {
-                        model.timeLinkedModels.add(this);
-                    }
 
                     timeSlider.linkSlider(model.timeSlider);
                     if (model.edalDataLayer != null) {

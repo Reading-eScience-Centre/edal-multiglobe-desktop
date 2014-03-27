@@ -43,9 +43,6 @@ import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
 
 import uk.ac.rdg.resc.edal.dataset.Dataset;
-import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
-import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
-import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
 import uk.ac.rdg.resc.edal.feature.GridFeature;
@@ -54,6 +51,7 @@ import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
 import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue;
+import uk.ac.rdg.resc.edal.metadata.GridVariableMetadata;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.ncwms.NcwmsCatalogue;
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsConfig;
@@ -63,16 +61,10 @@ import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.util.CollectionUtils;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
 import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
-import uk.ac.rdg.resc.edal.wms.util.ContactInfo;
-import uk.ac.rdg.resc.edal.wms.util.ServerInfo;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 
 public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage, FeatureCatalogue {
-//    private NcwmsConfig config;
-//    private Map<String, Dataset> datasets;
-//    private Map<String, NcwmsVariable> variables;
     private final LayerMenuItem rootMenuNode;
 
     private Map<String, GridFeature> gridFeatures;
@@ -80,12 +72,6 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
     public VideoWallCatalogue() throws IOException, JAXBException {
         super(NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml")));
         
-//        config = NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml"));
-//        config.setDatasetLoadedHandler(this);
-//        config.loadDatasets();
-
-//        datasets = new HashMap<>();
-//        variables = new HashMap<>();
         gridFeatures = new HashMap<>();
 
         rootMenuNode = new LayerMenuItem("Datasets", "root", false);
@@ -207,13 +193,13 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
      * @throws WmsLayerNotFoundException
      *             If the WMS layer name doesn't map to a variable
      */
-    public VariableMetadata getVariableMetadataForLayer(String layerName) throws EdalException {
+    public VariableMetadata getVariableMetadataForLayer(String layerName) throws WmsLayerNotFoundException {
         Dataset dataset = getDatasetFromLayerName(layerName);
         String variableFromId = getVariableIdFromLayerName(layerName);
         if (dataset != null && variableFromId != null) {
             return dataset.getVariableMetadata(variableFromId);
         } else {
-            throw new EdalException("The layer name " + layerName + " doesn't map to a variable");
+            throw new WmsLayerNotFoundException("The layer name " + layerName + " doesn't map to a variable");
         }
     }
 
@@ -270,5 +256,9 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
     @Override
     public String getLayerName(String datasetId, String variableId) {
         return datasetId + "/" + variableId;
+    }
+    
+    public boolean layerIsGridded(String layerName) throws WmsLayerNotFoundException  {
+        return getVariableMetadataForLayer(layerName) instanceof GridVariableMetadata;
     }
 }
