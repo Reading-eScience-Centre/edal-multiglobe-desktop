@@ -44,7 +44,6 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 
 import org.joda.time.DateTime;
@@ -117,8 +116,8 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         logScale = layerMetadata.isLogScaling();
         numColorBands = layerMetadata.getNumColorBands();
         bgColor = new Color(0, true);
-        underColor = Color.black;
-        overColor = Color.black;
+        underColor = new Color(0, 0, 0, 64);
+        overColor = new Color(0, 0, 0, 64);
 
         drawLayer();
     }
@@ -179,7 +178,8 @@ public class EdalProfileDataLayer implements EdalDataLayer {
             /*
              * TODO generate a legend here
              */
-            return null;
+            return dataLayer.colourScheme.getScaleBar(LEGEND_WIDTH, size, 0.05f, true, true,
+                    Color.lightGray, new Color(0, 0, 0, 150));
         } else {
             System.out.println("can't get legend, datalayer is null!");
         }
@@ -230,7 +230,8 @@ public class EdalProfileDataLayer implements EdalDataLayer {
             setPickEnabled(true);
 
             /*
-             * Start the feature extraction in a new thread, so that we don't get a pause
+             * Start the feature extraction in a new thread, so that we don't
+             * get a pause
              */
             Executors.newSingleThreadExecutor().submit(new Runnable() {
                 @Override
