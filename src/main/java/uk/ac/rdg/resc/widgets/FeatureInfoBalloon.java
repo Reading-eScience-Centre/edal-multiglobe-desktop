@@ -56,11 +56,11 @@ import java.text.DecimalFormat;
 import uk.ac.rdg.resc.RescWorldWindow;
 
 public class FeatureInfoBalloon extends DialogAnnotation implements SelectListener {
-    private static final DecimalFormat NUMBER_3DP = new DecimalFormat("#0.000");
+    public static final DecimalFormat NUMBER_3DP = new DecimalFormat("#0.000");
     public static final int TARGET_WIDTH = 300;
     public static final int TARGET_HEIGHT = 150;
     public static final double PREVIEW_SCALE = 0.5;
-    
+
     private static final String RESC_CLOSE_IMAGE_PATH = "images/closeBubble.png";
 
     private RescWorldWindow wwd;
@@ -88,6 +88,12 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         initFeatureInfoComponents();
         layoutFeatureInfoComponents();
 
+        /*
+         * This will ensure that markers (e.g. for profile data) are never
+         * plotted on top of this balloon
+         */
+        setAlwaysOnTop(true);
+
         wwd.addSelectListener(this);
     }
 
@@ -101,7 +107,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
 
         busyImage = new BusyImage(BUSY_IMAGE_PATH);
     }
-    
+
     protected void initFeatureInfoComponents() {
         closeFullScreen = new ButtonAnnotation(RESC_CLOSE_IMAGE_PATH, DEPRESSED_MASK_PATH);
 
@@ -211,6 +217,10 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                 } else if (selectObj == timeseriesGraph) {
                     addFullScreenAnnotation(timeseriesFullPath);
                 } else if (selectObj == closeFullScreen) {
+                    /*
+                     * Set this balloon to be always on top again
+                     */
+                    setAlwaysOnTop(true);
                     parent.removeAnnotation(fullScreenGraph);
                     fullScreenGraph = null;
                 }
@@ -240,6 +250,13 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         ImageAnnotation graph = new ImageAnnotation(graphFile);
         fullScreenGraph.addChild(graph);
         fullScreenGraph.addChild(closeFullScreen);
+
+        /*
+         * Stop the original balloon being on top, or else it will be displayed
+         * over the graph
+         */
+        setAlwaysOnTop(false);
+
         layout.setConstraint(closeFullScreen, AVKey.NORTHEAST);
         parent.addAnnotation(fullScreenGraph);
     }

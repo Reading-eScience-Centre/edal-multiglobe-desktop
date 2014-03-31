@@ -32,6 +32,7 @@ import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Color;
 import java.awt.Frame;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
@@ -117,6 +118,26 @@ public class VideoWall extends JFrame {
     }
 
     public static void main(String[] args) {
+        try {
+            /*
+             * This code sets the X Windows property WM_CLASS to
+             * "VideoWallGlobes"
+             * 
+             * This is useful for identifying the window for e.g. automatically
+             * handling it in a tiling window manager.
+             */
+            Toolkit xToolkit = Toolkit.getDefaultToolkit();
+            java.lang.reflect.Field awtAppClassNameField;
+            awtAppClassNameField = xToolkit.getClass().getDeclaredField("awtAppClassName");
+            awtAppClassNameField.setAccessible(true);
+            awtAppClassNameField.set(xToolkit, "VideoWallGlobes");
+        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException
+                | IllegalAccessException e) {
+            /*
+             * It doesn't really matter if it fails, so ignore it
+             */
+        }
+
         System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
         java.awt.EventQueue.invokeLater(new Runnable() {
             @Override

@@ -132,11 +132,12 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
         this.parent = parent;
 
         globe = new Earth();
-        flatMap = new EarthFlat();
+        globe.getElevationModel().setEnabled(false);
         setGlobe(globe);
 
-        annotationLayer = new AnnotationLayer() {
+        flatMap = new EarthFlat();
 
+        annotationLayer = new AnnotationLayer() {
             @Override
             protected void doRender(DrawContext dc) {
                 super.doRender(dc);
@@ -161,10 +162,10 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                 }
             }
         };
-        getLayers().add(annotationLayer);
 
         edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
         getLayers().add(edalConfigLayer);
+        getLayers().add(annotationLayer);
 
         wwd.addSelectListener(this);
 
@@ -348,11 +349,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                     if (model.edalDataLayer != null) {
                         timeSlider.setSliderValue(model.timeSlider.getSliderValue());
                         DateTime value = new DateTime((long) model.timeSlider.getSliderValue());
-                        Extent<Double> doubleRange = model.timeSlider.getSliderRange();
-                        Extent<DateTime> range = Extents.newExtent(new DateTime(doubleRange
-                                .getLow().longValue()), new DateTime(doubleRange.getHigh()
-                                .longValue()));
-                        edalDataLayer.setTime(value, range);
+                        edalDataLayer.setTime(value, model.getTimeSliderRange());
                     }
                 }
             }
@@ -363,6 +360,12 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
         } else {
             timeSlider = null;
         }
+    }
+
+    private Extent<DateTime> getTimeSliderRange() {
+        Extent<Double> doubleRange = timeSlider.getSliderRange();
+        return Extents.newExtent(new DateTime(doubleRange.getLow().longValue()), new DateTime(
+                doubleRange.getHigh().longValue()));
     }
 
     private void addLegend(int size) {
@@ -401,10 +404,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
     }
 
     public void showFeatureInfo(final Position position) {
-        //        if(balloon != null && balloon.getAttributes().isVisible()) {
-        //            return;
-        //        }
-        System.out.println("showFI called");
         /*
          * Only display feature info if we have an active layer
          */
@@ -467,7 +466,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                  */
                 Number value = null;
                 try {
-                    value = catalogue.getLayerValue(edalLayerName, position, null, null);
+                    value = catalogue.getLayerValue(edalLayerName, position,
+                            edalDataLayer.getElevation(), edalDataLayer.getTime(),
+                            elevationSlider.getSliderRange(), getTimeSliderRange(), 0.5);
                 } catch (EdalException e) {
                     /*
                      * There is a problem reading the data. We log the error and
@@ -478,12 +479,15 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                      * TODO log error in WW way
                      */
                     e.printStackTrace();
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
                 String valueText;
                 if (value == null || Double.isNaN(value.doubleValue())) {
                     valueText = "No data value here";
                 } else {
-                    valueText = "Value of layer " + metadata.getId() + " is " + value
+                    valueText = "Value of layer " + metadata.getId() + " is "
+                            + FeatureInfoBalloon.NUMBER_3DP.format(value)
                             + metadata.getParameter().getUnits();
                 }
 
@@ -537,7 +541,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                          * Generate a profile graph
                          */
                         Collection<? extends ProfileFeature> profiles = catalogue.getProfiles(
-                                edalLayerName, position);
+                                edalLayerName, position, elevationSlider.getSliderRange(),
+                                getTimeSliderRange(), 1);
                         if (profiles != null && profiles.size() > 0) {
                             JFreeChart profileChart = Charting.createVerticalProfilePlot(profiles,
                                     new HorizontalPosition(position.longitude.degrees,
@@ -575,6 +580,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                     /*
                      * Problem writing chart to data file store
                      */
+                    e.printStackTrace();
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
             }

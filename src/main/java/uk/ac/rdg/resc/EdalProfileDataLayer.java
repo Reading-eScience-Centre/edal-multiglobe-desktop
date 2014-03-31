@@ -28,6 +28,8 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.event.SelectEvent;
+import gov.nasa.worldwind.event.SelectListener;
 import gov.nasa.worldwind.geom.Angle;
 import gov.nasa.worldwind.geom.LatLon;
 import gov.nasa.worldwind.geom.Position;
@@ -43,6 +45,7 @@ import gov.nasa.worldwind.render.markers.MarkerAttributes;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executors;
 
@@ -66,6 +69,7 @@ import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
 
 public class EdalProfileDataLayer implements EdalDataLayer {
     private static final Color TRANSPARENT = new Color(0, true);
+    private static final double MARKER_SIZE = 5.0;
 
     final String layerName;
     private VideoWallCatalogue catalogue;
@@ -187,8 +191,6 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     }
 
     private void drawLayer() {
-        //        dataLayer = new EdalProfileData(elevation, elevationRange, time, timeRange, palette, scaleRange, logScale,
-        //                numColorBands, bgColor, underColor, overColor);
         EdalProfileData tempLayer = new EdalProfileData();
         if (dataLayer != null) {
             layerList.remove(dataLayer);
@@ -205,7 +207,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
      * 
      * @author Guy
      */
-    public class EdalProfileData extends MarkerLayer {
+    public class EdalProfileData extends MarkerLayer implements SelectListener {
         /*
          * We want to have one EdalProfileData layer per timestep. So when the
          * time changes, we will remove the layer and add a new one (probably,
@@ -219,9 +221,16 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         private SegmentColourScheme colourScheme;
         private List<ProfileFeature> features;
         private List<Marker> markers;
+        private List<Marker> activeMarkers;
         private String varId;
 
+        private Marker lastHighlit = null;
+
         public EdalProfileData() {
+            features = new ArrayList<>();
+            markers = new ArrayList<>();
+            activeMarkers = new ArrayList<>();
+
             ColourScale colourScale = new ColourScale(scaleRange, logScale);
             colourScheme = new SegmentColourScheme(colourScale, underColor, overColor, bgColor,
                     palette, numColorBands);
@@ -248,8 +257,6 @@ public class EdalProfileDataLayer implements EdalDataLayer {
                     }
 
                     varId = featuresForLayer.getMember();
-                    features = new ArrayList<>();
-                    markers = new ArrayList<>();
 
                     for (DiscreteFeature<?, ?> feature : featuresForLayer.getFeatures()) {
                         if (feature instanceof ProfileFeature) {
@@ -257,7 +264,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 
                             MarkerAttributes attrs = new BasicMarkerAttributes(new Material(
                                     TRANSPARENT), BasicMarkerShape.SPHERE, 1.0);
-                            attrs.setMarkerPixels(3);
+                            attrs.setMarkerPixels(MARKER_SIZE);
 
                             Marker marker = new BasicMarker(new Position(new LatLon(Angle
                                     .fromDegrees(profile.getHorizontalPosition().getY()), Angle
@@ -269,12 +276,15 @@ public class EdalProfileDataLayer implements EdalDataLayer {
                         }
                     }
                     elevationChanged();
-                    EdalProfileData.this.setMarkers(markers);
                 }
             });
+            this.setPickEnabled(true);
+            wwd.addSelectListener(this);
+
         }
 
         public void elevationChanged() {
+            activeMarkers.clear();
             /*
              * Go through map of profiles -> markers and set the colour
              */
@@ -294,18 +304,37 @@ public class EdalProfileDataLayer implements EdalDataLayer {
                 }
 
                 Color markerColor;
-                if (!profile.getDomain().getExtent().intersects(elevationRange)) {
-                    /*
-                     * If this profile is entirely out of the elevation range,
-                     * hide it
-                     */
-                    markerColor = TRANSPARENT;
-                    markers.get(i).getAttributes().setOpacity(0.0);
-                } else if (zIndex >= 0) {
-                    Number value = profile.getValues(varId).get(zIndex);
-                    markerColor = colourScheme.getColor(value);
-                    markers.get(i).getAttributes().setOpacity(1.0);
-                    markers.get(i).getAttributes().setMaterial(new Material(markerColor));
+                if (profile.getDomain().getExtent().intersects(elevationRange) && zIndex >= 0) {
+                    if (zIndex >= 0) {
+                        Number value = profile.getValues(varId).get(zIndex);
+                        markerColor = colourScheme.getColor(value);
+                        markers.get(i).getAttributes().setMaterial(new Material(markerColor));
+                        activeMarkers.add(markers.get(i));
+                    } else {
+                        markers.get(i).getAttributes().setMaterial(new Material(Color.green));
+                        activeMarkers.add(markers.get(i));
+                    }
+                }
+            }
+            EdalProfileData.this.setMarkers(activeMarkers);
+        }
+
+        @Override
+        public void selected(SelectEvent event) {
+            if (lastHighlit != null
+                    && (!event.hasObjects() || !event.getTopObject().equals(lastHighlit))) {
+                lastHighlit.getAttributes().setMarkerPixels(MARKER_SIZE);
+                lastHighlit = null;
+            }
+            if (event.hasObjects()) {
+                Object topObject = event.getTopObject();
+                if (topObject instanceof Marker) {
+                    if (event.isRollover()) {
+                        lastHighlit = (Marker) topObject;
+                        lastHighlit.getAttributes().setMarkerPixels(MARKER_SIZE * 1.5);
+                    } else if (event.isLeftClick()) {
+                        wwd.getModel().showFeatureInfo(((Marker) topObject).getPosition());
+                    }
                 }
             }
         }
