@@ -45,7 +45,6 @@ import gov.nasa.worldwind.render.markers.MarkerAttributes;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Executors;
 
@@ -92,6 +91,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     private Color bgColor;
     private Color underColor;
     private Color overColor;
+    private WmsLayerMetadata plottingMetadata;
 
     public EdalProfileDataLayer(String layerName, VideoWallCatalogue catalogue,
             LayerList layerList, RescWorldWindow wwd) throws EdalException {
@@ -114,11 +114,11 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         this.elevationRange = Extents.newExtent(this.elevation, this.elevation);
         this.timeRange = Extents.newExtent(this.time, this.time);
 
-        WmsLayerMetadata layerMetadata = catalogue.getLayerMetadata(layerName);
-        scaleRange = layerMetadata.getColorScaleRange();
-        palette = layerMetadata.getPalette();
-        logScale = layerMetadata.isLogScaling();
-        numColorBands = layerMetadata.getNumColorBands();
+        plottingMetadata = catalogue.getLayerMetadata(layerName);
+        scaleRange = plottingMetadata.getColorScaleRange();
+        palette = plottingMetadata.getPalette();
+        logScale = plottingMetadata.isLogScaling();
+        numColorBands = plottingMetadata.getNumColorBands();
         bgColor = new Color(0, true);
         underColor = new Color(0, 0, 0, 64);
         overColor = new Color(0, 0, 0, 64);
@@ -135,7 +135,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     }
 
     @Override
-    public void setElevation(Double elevation, Extent<Double> elevationRange) {
+    public void setElevation(double elevation, Extent<Double> elevationRange) {
         if (elevation > zDomain.getExtent().getHigh()) {
             this.elevation = zDomain.getExtent().getHigh();
         } else if (elevation < zDomain.getExtent().getLow()) {
@@ -145,7 +145,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         }
         this.elevationRange = elevationRange;
         if (dataLayer != null) {
-            dataLayer.elevationChanged();
+            dataLayer.redrawExistingProfiles();
         }
     }
 
@@ -167,8 +167,66 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     }
 
     @Override
-    public VariableMetadata getLayerMetadata() {
+    public void scaleLimitsChanged(Extent<Float> newScaleRange) {
+        this.scaleRange = newScaleRange;
+        dataLayer.colourSchemeChanged();
+        dataLayer.redrawExistingProfiles();
+    }
+
+    @Override
+    public void paletteChanged(String newPalette) {
+        this.palette = newPalette;
+        dataLayer.colourSchemeChanged();
+        dataLayer.redrawExistingProfiles();
+    }
+
+    @Override
+    public void aboveMaxColourChanged(Color aboveMax) {
+        this.overColor = aboveMax;
+        dataLayer.colourSchemeChanged();
+        dataLayer.redrawExistingProfiles();
+    }
+
+    @Override
+    public void belowMinColourChanged(Color belowMin) {
+        this.underColor = belowMin;
+        dataLayer.colourSchemeChanged();
+        dataLayer.redrawExistingProfiles();
+    }
+
+    @Override
+    public void setNumColourBands(int numColourBands) {
+        this.numColorBands = numColourBands;
+        dataLayer.colourSchemeChanged();
+        dataLayer.redrawExistingProfiles();
+    }
+
+    @Override
+    public void setOpacity(double opacity) {
+        dataLayer.setOpacity(opacity);
+    }
+
+    @Override
+    public void bulkChange(Extent<Float> scaleRange, String palette, Color belowMin,
+            Color aboveMax, boolean logScaling, int numColourBands) {
+        this.scaleRange = scaleRange;
+        this.palette = palette;
+        this.underColor = belowMin;
+        this.overColor = aboveMax;
+        this.logScale = logScaling;
+        this.numColorBands = numColourBands;
+        dataLayer.colourSchemeChanged();
+        dataLayer.redrawExistingProfiles();
+    }
+
+    @Override
+    public VariableMetadata getVariableMetadata() {
         return metadata;
+    }
+
+    @Override
+    public WmsLayerMetadata getPlottingMetadata() {
+        return plottingMetadata;
     }
 
     @Override
@@ -225,15 +283,18 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         private String varId;
 
         private Marker lastHighlit = null;
+        private double opacity;
 
         public EdalProfileData() {
+            super();
+
             features = new ArrayList<>();
             markers = new ArrayList<>();
             activeMarkers = new ArrayList<>();
 
-            ColourScale colourScale = new ColourScale(scaleRange, logScale);
-            colourScheme = new SegmentColourScheme(colourScale, underColor, overColor, bgColor,
-                    palette, numColorBands);
+            opacity = this.getOpacity();
+
+            colourSchemeChanged();
 
             setName(layerName);
             setPickEnabled(true);
@@ -249,7 +310,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
                     try {
                         featuresForLayer = catalogue.getFeaturesForLayer(layerName,
                                 new PlottingDomainParams(1, 1, BoundingBoxImpl.global(),
-                                        getLayerMetadata().getVerticalDomain().getExtent(),
+                                        getVariableMetadata().getVerticalDomain().getExtent(),
                                         timeRange, null, elevation, time));
                     } catch (EdalException e) {
                         e.printStackTrace();
@@ -275,7 +336,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
                             markers.add(marker);
                         }
                     }
-                    elevationChanged();
+                    redrawExistingProfiles();
                 }
             });
             this.setPickEnabled(true);
@@ -283,7 +344,26 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 
         }
 
-        public void elevationChanged() {
+        /**
+         * This re-calculates the colour scheme based on the values of the
+         * enclosing {@link EdalProfileDataLayer}, and should be called when any
+         * values have been changed.
+         */
+        public void colourSchemeChanged() {
+            ColourScale colourScale = new ColourScale(scaleRange, logScale);
+            colourScheme = new SegmentColourScheme(colourScale, underColor, overColor, bgColor,
+                    palette, numColorBands);
+        }
+
+        /**
+         * This method refreshes the colours of any profiles which are plotted
+         * on the map. Because the entirety of each profile is extracted when a
+         * layer is created, this should be called when the elevation or colour
+         * scheme has changed. However, when the time values of the parent
+         * {@link EdalProfileDataLayer} change, new features need to be
+         * extracted, so calling this method will not do anything.
+         */
+        public void redrawExistingProfiles() {
             activeMarkers.clear();
             /*
              * Go through map of profiles -> markers and set the colour
@@ -291,32 +371,36 @@ public class EdalProfileDataLayer implements EdalDataLayer {
             for (int i = 0; i < features.size(); i++) {
                 ProfileFeature profile = features.get(i);
 
-                int zIndex;
-                if (elevation == null) {
-                    /*
-                     * If no target z is provided, pick the value closest to the
-                     * surface
-                     */
-                    zIndex = profile.getDomain().findIndexOf(
-                            GISUtils.getClosestElevationToSurface(profile.getDomain()));
-                } else {
-                    zIndex = GISUtils.getIndexOfClosestElevationTo(elevation, profile.getDomain());
-                }
+                int zIndex = GISUtils.getIndexOfClosestElevationTo(elevation, profile.getDomain());
 
                 Color markerColor;
                 if (profile.getDomain().getExtent().intersects(elevationRange) && zIndex >= 0) {
-                    if (zIndex >= 0) {
-                        Number value = profile.getValues(varId).get(zIndex);
-                        markerColor = colourScheme.getColor(value);
-                        markers.get(i).getAttributes().setMaterial(new Material(markerColor));
-                        activeMarkers.add(markers.get(i));
-                    } else {
-                        markers.get(i).getAttributes().setMaterial(new Material(Color.green));
-                        activeMarkers.add(markers.get(i));
+                    Number value = profile.getValues(varId).get(zIndex);
+                    markerColor = colourScheme.getColor(value);
+                    if (markerColor.getAlpha() == 0) {
+                        /*
+                         * We don't want transparent markers to be 100%
+                         * transparent (as in gridded fields), so we set the
+                         * colour to be ~25% instead
+                         */
+                        markerColor = new Color(markerColor.getRed(), markerColor.getGreen(),
+                                markerColor.getBlue(), 64);
                     }
+                    if (opacity < 1.0) {
+                        markerColor = new Color(markerColor.getRed(), markerColor.getGreen(),
+                                markerColor.getBlue(), (int) (markerColor.getAlpha() * opacity));
+                    }
+                    markers.get(i).getAttributes().setMaterial(new Material(markerColor));
+                    activeMarkers.add(markers.get(i));
                 }
             }
             EdalProfileData.this.setMarkers(activeMarkers);
+        }
+
+        @Override
+        public void setOpacity(double opacity) {
+            this.opacity = opacity;
+            redrawExistingProfiles();
         }
 
         @Override

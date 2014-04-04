@@ -31,21 +31,12 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.BasicModel;
 import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.event.SelectEvent;
-import gov.nasa.worldwind.event.SelectListener;
 import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
 import gov.nasa.worldwind.layers.AnnotationLayer;
-import gov.nasa.worldwind.render.DrawContext;
-import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Cursor;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -79,7 +70,7 @@ import uk.ac.rdg.resc.widgets.FeatureInfoBalloon;
 import uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler;
 import uk.ac.rdg.resc.widgets.SliderWidgetAnnotation;
 
-public class RescModel extends BasicModel implements SliderWidgetHandler, SelectListener {
+public class RescModel extends BasicModel implements SliderWidgetHandler {
     private final static String ELEVATION_SLIDER = "depth-slider";
     private final static String TIME_SLIDER = "time-slider";
 
@@ -102,16 +93,10 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
     private EdalConfigLayer edalConfigLayer;
 
     private AnnotationLayer annotationLayer;
+    private AnnotationLayer fullScreenAnnotationLayer;
     private SliderWidgetAnnotation elevationSlider = null;
     private String elevationUnits = "";
     private SliderWidgetAnnotation timeSlider = null;
-    private ImageAnnotation legendAnnotation = null;
-
-    /*
-     * We store the viewport height so that if it changes we can re-generated
-     * the legend
-     */
-    private int lastViewportHeight = -1;
 
     private RescWorldWindow wwd;
 
@@ -120,9 +105,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
      * it if a user clicks somewhere else
      */
     private FeatureInfoBalloon balloon = null;
-
-    private boolean legendRefresh = false;
-    private boolean legendShrunk = false;
 
     public RescModel(VideoWallCatalogue catalogue, RescWorldWindow wwd, MultiGlobeFrame parent) {
         super();
@@ -137,37 +119,14 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
 
         flatMap = new EarthFlat();
 
-        annotationLayer = new AnnotationLayer() {
-            @Override
-            protected void doRender(DrawContext dc) {
-                super.doRender(dc);
-                if (edalDataLayer != null) {
-                    Rectangle viewport = dc.getView().getViewport();
-                    if (viewport.height != lastViewportHeight || legendRefresh) {
-                        lastViewportHeight = viewport.height;
-                        addLegend(viewport.height / 2);
-                    }
-                    if (legendAnnotation != null && legendAnnotation.getImageSource() != null) {
-                        int width = (int) (((BufferedImage) legendAnnotation.getImageSource())
-                                .getWidth() * legendAnnotation.getAttributes().getImageScale());
-                        int height = (int) (((BufferedImage) legendAnnotation.getImageSource())
-                                .getHeight() * legendAnnotation.getAttributes().getImageScale());
-
-                        int xOffset = legendShrunk ? -10 : 10;
-                        int yOffset = legendShrunk ? 10 : height / 2;
-
-                        legendAnnotation.setScreenPoint(new Point(viewport.x + viewport.width
-                                - width + xOffset, viewport.y + yOffset));
-                    }
-                }
-            }
-        };
+        annotationLayer = new AnnotationLayer();
+        getLayers().add(annotationLayer);
 
         edalConfigLayer = new EdalConfigLayer(wwd, catalogue);
         getLayers().add(edalConfigLayer);
-        getLayers().add(annotationLayer);
-
-        wwd.addSelectListener(this);
+        
+        fullScreenAnnotationLayer = new AnnotationLayer();
+        getLayers().add(fullScreenAnnotationLayer);
 
         //        SliderWidgetHandler handler = new SliderWidgetHandler() {
         //            @Override
@@ -217,8 +176,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
                     .getMapFeatureType(catalogue.getVariableIdFromLayerName(layerName));
 
-            VariableMetadata layerMetadata = null;
-
             EdalDataLayer tempLayer = null;
             if (MapFeature.class.isAssignableFrom(mapFeatureType)) {
                 try {
@@ -254,27 +211,27 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
             }
 
             edalDataLayer = tempLayer;
+            edalConfigLayer.setPaletteHandler(edalDataLayer);
 
-            legendRefresh = true;
+            /*
+             * Remove all annotations. This will get rid of the time and
+             * elevation sliders (new ones get put back if required), and also
+             * any feature info balloons.
+             */
+            annotationLayer.removeAllAnnotations();
 
-            layerMetadata = edalDataLayer.getLayerMetadata();
-
+            VariableMetadata layerMetadata = edalDataLayer.getVariableMetadata();
             if (layerMetadata != null) {
                 addSliders(layerMetadata);
             }
+
+            edalConfigLayer.addLegend(edalDataLayer);
 
             edalLayerName = layerName;
         }
     }
 
     private void addSliders(VariableMetadata layerMetadata) {
-        /*
-         * Remove all annotations. This will get rid of the time and elevation
-         * sliders (new ones get put back if required), and also any feature
-         * info balloons
-         */
-        annotationLayer.removeAllAnnotations();
-
         VerticalDomain verticalDomain = layerMetadata.getVerticalDomain();
         if (verticalDomain != null) {
             if (elevationSlider == null) {
@@ -363,44 +320,12 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
     }
 
     private Extent<DateTime> getTimeSliderRange() {
+        if (timeSlider == null) {
+            return null;
+        }
         Extent<Double> doubleRange = timeSlider.getSliderRange();
         return Extents.newExtent(new DateTime(doubleRange.getLow().longValue()), new DateTime(
                 doubleRange.getHigh().longValue()));
-    }
-
-    private void addLegend(int size) {
-        if (legendAnnotation != null) {
-            annotationLayer.removeAnnotation(legendAnnotation);
-        }
-        BufferedImage legend = edalDataLayer.getLegend(size, true);
-        if (legend != null) {
-            if (legend.getWidth() > size) {
-                /*
-                 * We have a big legend - i.e. a multidimensional field
-                 */
-
-                /*
-                 * First get a new legend with field labels
-                 */
-                legend = edalDataLayer.getLegend(size, true);
-                legendAnnotation = new ImageAnnotation(legend);
-                legendShrunk = true;
-                shrinkLegend(100);
-            } else {
-                legendAnnotation = new ImageAnnotation(legend);
-                legendShrunk = false;
-            }
-            legendRefresh = false;
-            legendAnnotation.setPickEnabled(true);
-            annotationLayer.addAnnotation(legendAnnotation);
-        }
-    }
-
-    private void shrinkLegend(int desiredSize) {
-        BufferedImage legend = (BufferedImage) legendAnnotation.getAttributes().getImageSource();
-        legendAnnotation.getAttributes().setImageScale((double) desiredSize / legend.getWidth());
-        legendAnnotation.getAttributes().setDrawOffset(
-                new Point(legend.getWidth() / 2, -legend.getHeight() + desiredSize));
     }
 
     public void showFeatureInfo(final Position position) {
@@ -437,7 +362,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
         if (balloon != null) {
             annotationLayer.removeAnnotation(balloon);
         }
-        balloon = new FeatureInfoBalloon(position, wwd, annotationLayer);
+        balloon = new FeatureInfoBalloon(position, wwd, annotationLayer, fullScreenAnnotationLayer);
         annotationLayer.addAnnotation(balloon);
         firePropertyChange(AVKey.LAYER, null, annotationLayer);
 
@@ -468,7 +393,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                 try {
                     value = catalogue.getLayerValue(edalLayerName, position,
                             edalDataLayer.getElevation(), edalDataLayer.getTime(),
-                            elevationSlider.getSliderRange(), getTimeSliderRange(), 0.5);
+                            elevationSlider == null ? null : elevationSlider.getSliderRange(),
+                            getTimeSliderRange(), 0.5);
                 } catch (EdalException e) {
                     /*
                      * There is a problem reading the data. We log the error and
@@ -503,7 +429,11 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                          * Generate a timeseries graph
                          */
                         Collection<? extends PointSeriesFeature> timeseries = catalogue
-                                .getTimeseries(edalLayerName, position);
+                                .getTimeseries(
+                                        edalLayerName,
+                                        position,
+                                        elevationSlider == null ? null : elevationSlider
+                                                .getSliderValue());
 
                         if (timeseries != null && timeseries.size() > 0) {
                             JFreeChart timeseriesChart = Charting.createTimeSeriesPlot(timeseries,
@@ -540,10 +470,20 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                         /*
                          * Generate a profile graph
                          */
-                        Collection<? extends ProfileFeature> profiles = catalogue.getProfiles(
-                                edalLayerName, position, elevationSlider.getSliderRange(),
-                                getTimeSliderRange(), 1);
+                        double sensitivity = 1;
+                        List<? extends ProfileFeature> profiles = catalogue.getProfiles(
+                                edalLayerName, position, null, getTimeSliderRange(), sensitivity);
                         if (profiles != null && profiles.size() > 0) {
+                            if (edalDataLayer instanceof EdalGridDataLayer) {
+                                /*
+                                 * If we have a gridded feature, we only want a
+                                 * profile from the nearest point plotted.
+                                 * 
+                                 * For a profile dataset it is less clear which one
+                                 * we require so we plot them all
+                                 */
+                                profiles = profiles.subList(0, 1);
+                            }
                             JFreeChart profileChart = Charting.createVerticalProfilePlot(profiles,
                                     new HorizontalPosition(position.longitude.degrees,
                                             position.latitude.degrees, DefaultGeographicCRS.WGS84));
@@ -649,47 +589,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, Select
                 break;
             default:
                 break;
-            }
-        }
-    }
-
-    @Override
-    public void selected(SelectEvent event) {
-        /*
-         * TODO Move the legend handling to the EdalConfigLayer, since it is not
-         * just an annotation
-         */
-        /*
-         * Listen for clicks on the legend.
-         */
-        if (event.hasObjects()) {
-            if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                if (event.getTopObject() == legendAnnotation) {
-                    if (legendShrunk) {
-                        /*
-                         * We have a shrunk version of the legend, in which case
-                         * we want to expand it
-                         */
-                        if (legendAnnotation.getAttributes().getImageScale() == 1.0) {
-                            shrinkLegend(100);
-                        } else {
-                            legendAnnotation.getAttributes().setImageScale(1.0);
-                            legendAnnotation.getAttributes().getDrawOffset().y = 0;
-                        }
-                    } else {
-                        /*
-                         * We have a normal legend, so we want to bring up the
-                         * scale configuration dialog
-                         */
-                    }
-                }
-            } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
-                if (event.getTopObject() == legendAnnotation) {
-                    ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
-                    event.consume();
-                } else {
-                    ((Component) wwd).setCursor(Cursor.getDefaultCursor());
-                }
             }
         }
     }

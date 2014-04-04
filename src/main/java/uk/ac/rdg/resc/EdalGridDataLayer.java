@@ -53,6 +53,7 @@ import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -109,6 +110,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
     private TimeCacher timeCacheTask = null;
     private ElevationCacher elevationCacheTask = null;
 
+    private WmsLayerMetadata plottingMetadata;
+
     public EdalGridDataLayer(String layerName, VideoWallCatalogue catalogue, LayerList layerList,
             RescWorldWindow wwd) throws EdalException {
         this.layerName = layerName;
@@ -135,11 +138,11 @@ public class EdalGridDataLayer implements EdalDataLayer {
 
         threadPool = Executors.newFixedThreadPool(2);
 
-        WmsLayerMetadata layerMetadata = catalogue.getLayerMetadata(layerName);
-        scaleRange = layerMetadata.getColorScaleRange();
-        palette = layerMetadata.getPalette();
-        logScale = layerMetadata.isLogScaling();
-        numColorBands = layerMetadata.getNumColorBands();
+        plottingMetadata = catalogue.getLayerMetadata(layerName);
+        scaleRange = plottingMetadata.getColorScaleRange();
+        palette = plottingMetadata.getPalette();
+        logScale = plottingMetadata.isLogScaling();
+        numColorBands = plottingMetadata.getNumColorBands();
         bgColor = new Color(0, true);
         underColor = Color.black;
         overColor = Color.black;
@@ -170,7 +173,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     }
 
     @Override
-    public void setElevation(Double elevation, Extent<Double> elevationRange) {
+    public void setElevation(double elevation, Extent<Double> elevationRange) {
         int zIndex = zAxis.findIndexOf(elevation);
         this.elevation = zAxis.getCoordinateValue(zIndex);
         drawLayer();
@@ -193,8 +196,68 @@ public class EdalGridDataLayer implements EdalDataLayer {
     }
 
     @Override
-    public GridVariableMetadata getLayerMetadata() {
+    public void scaleLimitsChanged(Extent<Float> newScaleRange) {
+        this.scaleRange = newScaleRange;
+        cacheFromCurrent();
+        drawLayer();
+    }
+
+    @Override
+    public void paletteChanged(String newPalette) {
+        System.out.println("palette changed to " + newPalette);
+        this.palette = newPalette;
+        cacheFromCurrent();
+        drawLayer();
+    }
+
+    @Override
+    public void aboveMaxColourChanged(Color aboveMax) {
+        this.overColor = aboveMax;
+        cacheFromCurrent();
+        drawLayer();
+    }
+
+    @Override
+    public void belowMinColourChanged(Color belowMin) {
+        this.underColor = belowMin;
+        cacheFromCurrent();
+        drawLayer();
+    }
+
+    @Override
+    public void setNumColourBands(int numColourBands) {
+        this.numColorBands = numColourBands;
+        drawLayer();
+    }
+    
+    @Override
+    public void setOpacity(double opacity) {
+        if (dataLayer != null) {
+            dataLayer.setOpacity(opacity);
+        }
+    }
+
+    @Override
+    public void bulkChange(Extent<Float> scaleRange, String palette, Color belowMin,
+            Color aboveMax, boolean logScaling, int numColourBands) {
+        this.scaleRange = scaleRange;
+        this.palette = palette;
+        this.underColor = belowMin;
+        this.overColor = aboveMax;
+        this.logScale = logScaling;
+        this.numColorBands = numColourBands;
+        cacheFromCurrent();
+        drawLayer();
+    }
+
+    @Override
+    public GridVariableMetadata getVariableMetadata() {
         return metadata;
+    }
+
+    @Override
+    public WmsLayerMetadata getPlottingMetadata() {
+        return plottingMetadata;
     }
 
     @Override
@@ -221,11 +284,14 @@ public class EdalGridDataLayer implements EdalDataLayer {
     }
 
     private void drawLayer() {
+        double opacity = 1.0;
         if (dataLayer != null) {
+            opacity = dataLayer.getOpacity();
             layerList.remove(dataLayer);
         }
         dataLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale, numColorBands,
                 bgColor, underColor, overColor);
+        dataLayer.setOpacity(opacity);
         layerList.add(dataLayer);
         wwd.redraw();
     }
@@ -320,7 +386,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
         public EdalGridData(Double elevation, DateTime time, String palette,
                 Extent<Float> scaleRange, boolean logScale, int numColorBands, Color bgColor,
                 Color underColor, Color overColor) {
-            super(makeLevelSet(layerName, elevation, time));
+            super(makeLevelSet(layerName, elevation, time, palette, scaleRange, logScale,
+                    numColorBands, bgColor, underColor, overColor));
             this.elevation = elevation;
             this.time = time;
 
@@ -526,8 +593,13 @@ public class EdalGridDataLayer implements EdalDataLayer {
         return image;
     }
 
-    private static LevelSet makeLevelSet(String layerName, Double elevation, DateTime time) {
-        String layerId = layerName + ":" + elevation + ":" + time;
+    private static LevelSet makeLevelSet(String layerName, Double elevation, DateTime time,
+            String palette, Extent<Float> scaleRange, boolean logScale, int numColorBands,
+            Color bgColor, Color underColor, Color overColor) {
+        String layerId = layerName + ":" + elevation + ":" + time + ":" + palette + ":"
+                + scaleRange.toString() + ":" + logScale + ":" + numColorBands + ":" + bgColor
+                + ":" + underColor + underColor.getAlpha() + ":" + overColor + overColor.getAlpha();
+        layerId = UUID.nameUUIDFromBytes(layerId.getBytes()).toString();
         /*
          * Now use the catalogue to determine how many levels we should generate
          */

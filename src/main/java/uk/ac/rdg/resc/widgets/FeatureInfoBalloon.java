@@ -38,7 +38,6 @@ import gov.nasa.worldwind.render.Annotation;
 import gov.nasa.worldwind.render.AnnotationAttributes;
 import gov.nasa.worldwind.render.AnnotationFlowLayout;
 import gov.nasa.worldwind.render.AnnotationNullLayout;
-import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.render.ScreenAnnotation;
 import gov.nasa.worldwindx.examples.util.ButtonAnnotation;
 import gov.nasa.worldwindx.examples.util.DialogAnnotation;
@@ -64,7 +63,8 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
     private static final String RESC_CLOSE_IMAGE_PATH = "images/closeBubble.png";
 
     private RescWorldWindow wwd;
-    private AnnotationLayer parent;
+    private AnnotationLayer balloonLayer;
+    private AnnotationLayer graphLayer;
 
     private ScreenAnnotation titleLabel;
 
@@ -79,11 +79,12 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
 
     private Annotation featureInfoContent;
 
-    public FeatureInfoBalloon(Position position, RescWorldWindow wwd, AnnotationLayer parent) {
+    public FeatureInfoBalloon(Position position, RescWorldWindow wwd, AnnotationLayer balloonLayer, AnnotationLayer graphLayer) {
         super(position);
 
         this.wwd = wwd;
-        this.parent = parent;
+        this.balloonLayer = balloonLayer;
+        this.graphLayer = graphLayer;
 
         initFeatureInfoComponents();
         layoutFeatureInfoComponents();
@@ -210,7 +211,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                      * don't immediately get another FeatureInfoBalloon
                      * displayed
                      */
-                    parent.removeAnnotation(FeatureInfoBalloon.this);
+                    balloonLayer.removeAnnotation(FeatureInfoBalloon.this);
                     wwd.removeSelectListener(this);
                 } else if (selectObj == profileGraph) {
                     addFullScreenAnnotation(profileFullPath);
@@ -221,7 +222,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                      * Set this balloon to be always on top again
                      */
                     setAlwaysOnTop(true);
-                    parent.removeAnnotation(fullScreenGraph);
+                    graphLayer.removeAnnotation(fullScreenGraph);
                     fullScreenGraph = null;
                 }
                 event.getMouseEvent().consume();
@@ -258,6 +259,6 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         setAlwaysOnTop(false);
 
         layout.setConstraint(closeFullScreen, AVKey.NORTHEAST);
-        parent.addAnnotation(fullScreenGraph);
+        graphLayer.addAnnotation(fullScreenGraph);
     }
 }

@@ -6,6 +6,8 @@ import org.joda.time.DateTime;
 
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
+import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
+import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
 
 /*******************************************************************************
  * Copyright (c) 2014 The University of Reading All rights reserved.
@@ -33,20 +35,22 @@ import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
 
-public interface EdalDataLayer {
+public interface EdalDataLayer extends PaletteSelectionHandler {
     public static final int LEGEND_WIDTH = 20;
     
     public void destroy();
 
-    public void setElevation(Double elevation, Extent<Double> elevationRange);
+    public void setElevation(double elevation, Extent<Double> elevationRange);
 
     public Double getElevation();
 
     public void setTime(DateTime time, Extent<DateTime> timeRange);
 
     public DateTime getTime();
-
-    public VariableMetadata getLayerMetadata();
+    
+    public VariableMetadata getVariableMetadata();
+    
+    public WmsLayerMetadata getPlottingMetadata();
 
     public BufferedImage getLegend(int size);
 

@@ -78,17 +78,12 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     protected Color elementColor;
     protected Insets interiorInsets;
 
-    //    private boolean highlighted = false;
-    //    private Color highlightColor;
-
     private String orientation;
     SliderWidgetHandler handler;
     private Point lastDragPoint = null;
-    private Point lastRightDragPoint = null;
 
     private DoubleBuffer elementBuffer;
     private DoubleBuffer centreElementBuffer;
-    //    private boolean recalculateElementBuffer = false;
 
     private Thread sliderTimer = null;
 

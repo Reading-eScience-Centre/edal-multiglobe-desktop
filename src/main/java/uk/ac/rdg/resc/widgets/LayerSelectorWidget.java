@@ -142,10 +142,8 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
         currentItem = parentItem;
         /*
          * We could keep track of all the non-title elements and remove them
-         * here, but it's simpler to remove everything and then always re-add
+         * here, but it's simple to remove everything and then always re-add
          * the title
-         * 
-         * TODO maybe not, since we need the list anyway...
          */
         menuItemPanel.removeAllChildren();
         pickableItems.clear();

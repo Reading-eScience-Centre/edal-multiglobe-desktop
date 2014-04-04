@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -165,13 +166,18 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
         }
     }
 
-    public Collection<? extends ProfileFeature> getProfiles(String layerId, Position position,
+    public List<? extends ProfileFeature> getProfiles(String layerId, Position position,
             Extent<Double> elevationRange, Extent<DateTime> timeRange, double sensitivity)
             throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
         String varId = getVariableIdFromLayerName(layerId);
-        try {
-            Collection<? extends ProfileFeature> profileFeatures = dataset.extractProfileFeatures(
+        if (!dataset.supportsProfileFeatureExtraction(varId)) {
+            /*
+             * Profile features not supported
+             */
+            return new ArrayList<>();
+        } else {
+            List<? extends ProfileFeature> profileFeatures = dataset.extractProfileFeatures(
                     CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1,
                             new BoundingBoxImpl(position.longitude.degrees - sensitivity,
                                     position.latitude.degrees - sensitivity,
@@ -182,16 +188,11 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                                     position.latitude.degrees, DefaultGeographicCRS.WGS84), null,
                             null));
             return profileFeatures;
-        } catch (UnsupportedOperationException e) {
-            /*
-             * Profile features not supported
-             */
-            return new ArrayList<>();
         }
     }
 
-    public Collection<? extends PointSeriesFeature> getTimeseries(String layerId, Position position)
-            throws EdalException {
+    public Collection<? extends PointSeriesFeature> getTimeseries(String layerId,
+            Position position, Double elevation) throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
         String varId = getVariableIdFromLayerName(layerId);
         VariableMetadata variableMetadata = dataset.getVariableMetadata(varId);
