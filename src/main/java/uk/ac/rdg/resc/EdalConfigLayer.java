@@ -30,6 +30,7 @@ package uk.ac.rdg.resc;
 
 import gov.nasa.worldwind.event.SelectEvent;
 import gov.nasa.worldwind.event.SelectListener;
+import gov.nasa.worldwind.layers.Layer;
 import gov.nasa.worldwind.layers.RenderableLayer;
 import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.util.Logging;
@@ -48,12 +49,22 @@ import uk.ac.rdg.resc.widgets.PaletteSelectorWidget;
 import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
 
 /**
- * A layer to hold all configuration annotations
+ * This {@link Layer} contains buttons for:
  * 
- * @author Guy
+ * <li>Switching between a flat map and a globe
+ * 
+ * <li>Displaying the {@link LayerSelectorWidget}
+ * 
+ * <li>Changing how a view links with other views
+ * 
+ * <li>Displaying the {@link PaletteSelectorWidget} (and displaying the legend)
+ * 
+ * @author Guy Griffiths
  */
 public class EdalConfigLayer extends RenderableLayer implements SelectListener {
-    //    private final static String CONFIG_BUTTON = "images/config_button.png";
+    /*
+     * Locations of images for the buttons
+     */
     private final static String LAYERS_BUTTON = "images/layers_button.png";
     private final static String LINK_BUTTON = "images/link_button.png";
     private final static String UNLINK_BUTTON = "images/unlink_button.png";
@@ -61,40 +72,83 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
     private final static String GLOBE_BUTTON = "images/flat_globe.png";
     private final static String MAP_BUTTON = "images/flat_map.png";
 
+    /** The width of the border around various objects */
+    private static final int BORDER_WIDTH = 20;
+
+    /** The {@link RescWorldWindow} which this layer can make changes to */
     protected RescWorldWindow wwd;
+    /**
+     * The {@link VideoWallCatalogue} used to populate the
+     * {@link LayerSelectorWidget}
+     */
     protected VideoWallCatalogue catalogue;
 
+    /** The button to display the {@link LayerSelectorWidget} */
     private ImageAnnotation layersButton;
 
+    /**
+     * The button containing the current link state. Clicking this will make all
+     * link choice buttons appear
+     */
     private ImageAnnotation linkStateButton;
+    /** The button to select the LINKED state */
     private ImageAnnotation linkButton;
+    /** The button to select the ANTILINKED state */
     private ImageAnnotation antilinkButton;
+    /** The button to select the UNLINKED state */
     private ImageAnnotation unlinkButton;
 
+    /**
+     * The button to switch between globe/flat map, and to toggle flat map
+     * projections
+     */
     private ImageAnnotation flatButton;
 
+    /** The {@link LayerSelectorWidget} to allow for layer selection */
     private LayerSelectorWidget layerSelector;
-
-    private int borderWidth = 20;
 
     /*
      * Colourbar/legend related objects
      */
 
+    /** The image representing the colour scale used */
     private ImageAnnotation legendAnnotation = null;
 
-    /*
+    /**
      * We store the viewport height so that if it changes we can re-generated
      * the legend
      */
     private int lastViewportHeight = -1;
 
+    /**
+     * Whether the current legend needs to be re-generated (e.g. when the colour
+     * scale changes, or when the size changes)
+     */
     private boolean legendRefresh = false;
+    /**
+     * Whether or not the legend is currently shrunk. This only applies to
+     * legends for >1D fields
+     * 
+     * TODO Such legends need better handling - currently colour scale etc.
+     * can't be adjusted
+     */
     private boolean legendShrunk = false;
 
+    /** The {@link PaletteSelectorWidget} to adjust colour scale */
     private PaletteSelectorWidget paletteSelector = null;
+
+    /** The {@link EdalDataLayer} being used to generate the legend */
     private EdalDataLayer edalDataLayer;
 
+    /**
+     * Instantiate a new {@link EdalConfigLayer}
+     * 
+     * @param wwd
+     *            The {@link RescWorldWindow} which this layer is attached to
+     * @param catalogue
+     *            The {@link VideoWallCatalogue} which will supply the layer
+     *            menu
+     */
     public EdalConfigLayer(RescWorldWindow wwd, VideoWallCatalogue catalogue) {
         if (wwd == null) {
             String msg = Logging.getMessage("nullValue.WorldWindow");
@@ -109,10 +163,13 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
 
         this.wwd = wwd;
         this.catalogue = catalogue;
-        this.initialize();
+        this.initialise();
     }
 
-    protected void initialize() {
+    /**
+     * Initialise the required images etc.
+     */
+    protected void initialise() {
         layersButton = new ImageAnnotation(LAYERS_BUTTON);
         layersButton.setScreenPoint(new Point(0, 0));
         layersButton.setPickEnabled(true);
@@ -149,20 +206,75 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         paletteSelector.getAttributes().setOpacity(1.0);
         addRenderable(paletteSelector);
 
-        // Listen to world window for select event
+        /* Add to WorldWindow to get select events */
         wwd.addSelectListener(this);
         wwd.addSelectListener(layerSelector);
         wwd.addSelectListener(paletteSelector);
     }
-    
+
+    /**
+     * Sets the {@link PaletteSelectionHandler} which will receive events when
+     * the palette changes
+     * 
+     * @param handler
+     */
     public void setPaletteHandler(PaletteSelectionHandler handler) {
-        if(paletteSelector != null) {
+        if (paletteSelector != null) {
             paletteSelector.setPaletteSelectionHandler(handler);
         }
     }
 
+    /**
+     * Displays the {@link PaletteSelectorWidget}
+     */
+    private void displayPaletteSelector() {
+        /*
+         * Save the palette state so that is can be restored if a user clicks
+         * cancel
+         */
+        paletteSelector.setOpened();
+        /*
+         * Hide the legend (changes in the palette selector will make it
+         * invalid)
+         */
+        legendAnnotation.getAttributes().setVisible(false);
+        paletteSelector.getAttributes().setVisible(true);
+    }
+
+    /**
+     * Hides the {@link PaletteSelectorWidget} if it is visible
+     */
+    public void hidePaletteSelector() {
+        /*
+         * Reshow the legend and set it to be redrawn when it is next visible
+         */
+        legendAnnotation.getAttributes().setVisible(true);
+        paletteSelector.getAttributes().setVisible(false);
+        legendRefresh = true;
+    }
+
+    /**
+     * Sets the legend to match a given {@link EdalDataLayer}
+     * 
+     * @param edalDataLayer
+     *            The {@link EdalDataLayer} which will provide the legend
+     */
+    public void setLegend(EdalDataLayer edalDataLayer) {
+        this.edalDataLayer = edalDataLayer;
+        WmsLayerMetadata plottingMetadata = edalDataLayer.getPlottingMetadata();
+        if (plottingMetadata != null) {
+            paletteSelector.setPaletteProperties(plottingMetadata, Color.black, Color.black);
+        }
+        legendRefresh = true;
+        legendAnnotation.getAttributes().setVisible(true);
+    }
+
+    /**
+     * Populates the {@link LayerSelectorWidget} with the latest menu and
+     * displays it
+     */
     private void displayLayerSelector() {
-        layerSelector.populateLayerSelector(catalogue.getEdalLayers());
+        layerSelector.populateLayerSelector(catalogue.getLayerMenu());
         layerSelector.displayDatasets();
         layerSelector.getAttributes().setVisible(true);
         /*
@@ -170,18 +282,6 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
          * simultaneously
          */
         paletteSelector.getAttributes().setVisible(false);
-    }
-
-    public void hidePaletteSelector() {
-        legendAnnotation.getAttributes().setVisible(true);
-        paletteSelector.getAttributes().setVisible(false);
-        legendRefresh = true;
-    }
-
-    private void displayPaletteSelector() {
-        paletteSelector.setOpened();
-        legendAnnotation.getAttributes().setVisible(false);
-        paletteSelector.getAttributes().setVisible(true);
     }
 
     /**
@@ -206,7 +306,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                 }
             } else if (event.getTopObject() == linkButton) {
                 if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                    wwd.getLinkedView().setLinkState(LinkedViewState.LINKED);
+                    wwd.getView().setLinkState(LinkedViewState.LINKED);
                     linkStateButton.setImageSource(LINK_BUTTON);
                     removeRenderable(linkButton);
                     removeRenderable(antilinkButton);
@@ -215,7 +315,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                 }
             } else if (event.getTopObject() == antilinkButton) {
                 if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                    wwd.getLinkedView().setLinkState(LinkedViewState.ANTILINKED);
+                    wwd.getView().setLinkState(LinkedViewState.ANTILINKED);
                     linkStateButton.setImageSource(ANTILINK_BUTTON);
                     removeRenderable(linkButton);
                     removeRenderable(antilinkButton);
@@ -224,7 +324,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                 }
             } else if (event.getTopObject() == unlinkButton) {
                 if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                    wwd.getLinkedView().setLinkState(LinkedViewState.UNLINKED);
+                    wwd.getView().setLinkState(LinkedViewState.UNLINKED);
                     linkStateButton.setImageSource(UNLINK_BUTTON);
                     removeRenderable(linkButton);
                     removeRenderable(antilinkButton);
@@ -239,6 +339,11 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                         flatButton.setImageSource(MAP_BUTTON);
                     } else {
                         flatButton.setImageSource(GLOBE_BUTTON);
+                    }
+                } else if (event.getEventAction().equals(SelectEvent.RIGHT_CLICK)) {
+                    RescModel model = wwd.getModel();
+                    if (model.isFlat()) {
+                        model.cycleProjection();
                     }
                 }
             } else if (event.getTopObject() == legendAnnotation) {
@@ -262,22 +367,21 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                         displayPaletteSelector();
                     }
                 }
-                //            } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
-                //                if (event.getTopObject() == legendAnnotation) {
-                //                    ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
-                //                    event.consume();
-                //                }
-                //            } else {
-                //                ((Component) wwd).setCursor(Cursor.getDefaultCursor());
+                /*
+                 * TODO Make the cursor appear as a hand on rollover - I think
+                 * this needs to be co-ordinated centrally for all elements
+                 * which require it
+                 */
             }
         }
     }
 
-    protected static String encodeHTMLColor(Color c) {
-        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
-    }
-
-    private static final int PALETTEBOX_MIN_SIZE = 250;
+    /**
+     * The minimum size of the {@link PaletteSelectorWidget}. Generally we set
+     * the {@link PaletteSelectorWidget} width to be half the viewport size, but
+     * not if that is smaller than this value
+     */
+    private static final int PALETTE_SELECTOR_MIN_SIZE = 250;
 
     @Override
     public void render(DrawContext dc) {
@@ -287,11 +391,10 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
          * Config buttons
          */
         this.layersButton.setScreenPoint(getButtonLocation(dc, 0, 0));
-        int x = 70;
-        this.linkStateButton.setScreenPoint(getButtonLocation(dc, x, 0));
-        this.linkButton.setScreenPoint(getButtonLocation(dc, x, 0));
-        this.antilinkButton.setScreenPoint(getButtonLocation(dc, x, -70));
-        this.unlinkButton.setScreenPoint(getButtonLocation(dc, x, -140));
+        this.linkStateButton.setScreenPoint(getButtonLocation(dc, 70, 0));
+        this.linkButton.setScreenPoint(getButtonLocation(dc, 70, 0));
+        this.antilinkButton.setScreenPoint(getButtonLocation(dc, 70, -70));
+        this.unlinkButton.setScreenPoint(getButtonLocation(dc, 70, -140));
         this.flatButton.setScreenPoint(getButtonLocation(dc, 0, -70));
 
         /*
@@ -299,10 +402,10 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
          */
         if (this.layerSelector.getAttributes().isVisible()) {
             this.layerSelector.getAttributes().setSize(
-                    new Dimension(viewport.width - borderWidth, 0));
+                    new Dimension(viewport.width - BORDER_WIDTH, 0));
             Dimension layerSelectorActualSize = layerSelector.getPreferredSize(dc);
             this.layerSelector.setScreenPoint(new Point(viewport.x + viewport.width / 2, viewport.y
-                    + borderWidth / 2 + (viewport.height - layerSelectorActualSize.height) / 2));
+                    + BORDER_WIDTH / 2 + (viewport.height - layerSelectorActualSize.height) / 2));
         }
 
         /*
@@ -330,30 +433,46 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
          */
         if (this.paletteSelector != null && this.paletteSelector.getAttributes().isVisible()) {
             int paletteSize = viewport.width / 2;
-            if (paletteSize < PALETTEBOX_MIN_SIZE) {
-                if (PALETTEBOX_MIN_SIZE > viewport.width - borderWidth) {
-                    paletteSize = viewport.width - borderWidth;
+            if (paletteSize < PALETTE_SELECTOR_MIN_SIZE) {
+                if (PALETTE_SELECTOR_MIN_SIZE > viewport.width - BORDER_WIDTH) {
+                    paletteSize = viewport.width - BORDER_WIDTH;
                 } else {
-                    paletteSize = PALETTEBOX_MIN_SIZE;
+                    paletteSize = PALETTE_SELECTOR_MIN_SIZE;
                 }
             }
             this.paletteSelector.getAttributes().setSize(new Dimension(paletteSize, 0));
             Dimension paletteSelectorActualSize = paletteSelector.getPreferredSize(dc);
             this.paletteSelector.setScreenPoint(new Point(viewport.x + viewport.width / 2,
-                    viewport.y + borderWidth / 2
+                    viewport.y + BORDER_WIDTH / 2
                             + (viewport.height - paletteSelectorActualSize.height) / 2));
         }
 
         super.render(dc);
     }
 
+    /**
+     * Used to calculate the position for the buttons
+     * 
+     * @param dc
+     *            The current {@link DrawContext}
+     * @param xOffset
+     *            The offset in pixels in the x direction
+     * @param yOffset
+     *            The offset in pixels in the y direction
+     * @return A {@link Point} representing the absolute position of the button
+     */
     private Point getButtonLocation(DrawContext dc, int xOffset, int yOffset) {
-        int x = borderWidth + layersButton.getPreferredSize(dc).width / 2 + xOffset;
-        //        int y = (int) layersButton.getPreferredSize(dc).height / 2 + this.borderWidth - yOffset;
-        int y = borderWidth - yOffset;
+        int x = BORDER_WIDTH + layersButton.getPreferredSize(dc).width / 2 + xOffset;
+        int y = BORDER_WIDTH - yOffset;
         return new Point(x, y);
     }
 
+    /**
+     * Retrieves the legend image and sets it on the annotation
+     * 
+     * @param size
+     *            The size of the legend to generate
+     */
     private void addLegend(int size) {
         if (edalDataLayer != null) {
             BufferedImage legend = edalDataLayer.getLegend(size, true);
@@ -379,27 +498,17 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         }
     }
 
+    /**
+     * Scales the legend
+     * 
+     * @param desiredSize
+     *            The final size of the scaled image
+     */
     private void shrinkLegend(int desiredSize) {
         BufferedImage legend = (BufferedImage) legendAnnotation.getAttributes().getImageSource();
         legendAnnotation.getAttributes().setImageScale((double) desiredSize / legend.getWidth());
         legendAnnotation.getAttributes().setDrawOffset(
                 new Point(legend.getWidth() / 2, -legend.getHeight() + desiredSize));
-    }
-
-    @Override
-    public String toString() {
-        return Logging.getMessage("layers.LayerManagerLayer.Name");
-    }
-
-    public void addLegend(EdalDataLayer edalDataLayer) {
-        this.edalDataLayer = edalDataLayer;
-        WmsLayerMetadata plottingMetadata = edalDataLayer.getPlottingMetadata();
-        if (plottingMetadata != null) {
-            paletteSelector.setPaletteProperties(plottingMetadata, Color.black, Color.black,
-                    new Color(0, true));
-        }
-        legendRefresh = true;
-        legendAnnotation.getAttributes().setVisible(true);
     }
 
 }

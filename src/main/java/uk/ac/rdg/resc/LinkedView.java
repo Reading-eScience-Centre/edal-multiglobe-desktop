@@ -44,20 +44,33 @@ import java.util.Set;
  * adjusts to ensure that this view displays the opposite hemisphere of the
  * earth to the one it is linked to.
  * 
- * @author Guy
+ * @author Guy Griffiths
  */
 public class LinkedView extends BasicOrbitView {
+    /**
+     * The views which this view synchronises with
+     */
     private Set<LinkedView> linkedViews = new HashSet<>();
 
+    /**
+     * The three states a linked view can have.
+     * 
+     * UNLINKED means that the view is independent of other views it is linked
+     * with
+     * 
+     * LINKED and ANTILINKED views always move in sync with one another. If two
+     * views are both LINKED, they will show the same view. If one is LINKED and
+     * one is ANTILINKED they will show opposite hemispheres
+     */
     public enum LinkedViewState {
         LINKED, ANTILINKED, UNLINKED
     }
 
+    /** The {@link LinkedViewState} which this view is currently in */
     private LinkedViewState linkState = LinkedViewState.LINKED;
 
     public void setLinkState(LinkedViewState linkState) {
         this.linkState = linkState;
-        boolean done = false;
         if (linkState == LinkedViewState.LINKED || linkState == LinkedViewState.ANTILINKED) {
             /*
              * If we're switching back to a linked view, sync with the other
@@ -66,25 +79,21 @@ public class LinkedView extends BasicOrbitView {
             Iterator<LinkedView> iterator = linkedViews.iterator();
             while (iterator.hasNext()) {
                 LinkedView linkedView = iterator.next();
-                if (linkedView.linkState == LinkedViewState.LINKED) {
+                if (linkedView.linkState == linkState) {
                     setLinkedCenterPosition(linkedView.getCenterPosition());
                     setLinkedZoom(linkedView.getZoom());
                     setLinkedHeading(linkedView.getHeading());
                     setLinkedPitch(linkedView.getPitch());
-                    done = true;
                     break;
                 }
-            }
-            if (!done) {
-                /*
-                 * We didn't find any other linked views, so we need to look for
-                 * antilinked views instead
-                 */
             }
         }
         firePropertyChange(AVKey.VIEW, null, this);
     }
-    
+
+    /**
+     * @return The {@link LinkedViewState} of this view
+     */
     public LinkedViewState getLinkedViewState() {
         return linkState;
     }
@@ -93,9 +102,17 @@ public class LinkedView extends BasicOrbitView {
      * Links views together.
      * 
      * @param view
+     *            The {@link LinkedView} to link with this one
      */
     public void addLinkedView(LinkedView view) {
+        /*
+         * Don't allow views to link with themselves
+         */
         if (this != view) {
+            /*
+             * Start the view in a linked state, and set it's
+             * position/heading/pitch/zoom
+             */
             linkedViews.add(view);
             view.linkedViews.add(this);
             view.linkState = LinkedViewState.LINKED;
@@ -116,7 +133,13 @@ public class LinkedView extends BasicOrbitView {
              */
             linkState = LinkedViewState.UNLINKED;
         }
+        /*
+         * Set the position as per BasicOrbitView
+         */
         super.setCenterPosition(center);
+        /*
+         * Now set the centre position on all linked views
+         */
         switch (linkState) {
         case LINKED:
             for (LinkedView view : linkedViews) {
@@ -135,12 +158,31 @@ public class LinkedView extends BasicOrbitView {
         }
     }
 
+    /**
+     * Called by other {@link LinkedView}s when the centre of their view changes
+     * 
+     * @param center
+     *            The {@link Position} of the view centre
+     */
     private void setLinkedCenterPosition(Position center) {
         switch (linkState) {
         case ANTILINKED:
+            /*
+             * If another view is linked, we want to switch the centre position
+             * to the opposite hemisphere.
+             * 
+             * If the other view which called this method is also antilinked,
+             * the centre position will be switched twice so this will match it
+             */
             center = Position.fromDegrees(-center.latitude.degrees,
                     180.0 + center.longitude.degrees, center.elevation);
+            /*
+             * Note the use of switch here - no break is required
+             */
         case LINKED:
+            /*
+             * Now set the centre position and redraw
+             */
             super.setCenterPosition(center);
             firePropertyChange(AVKey.VIEW, null, this);
             break;
@@ -152,56 +194,53 @@ public class LinkedView extends BasicOrbitView {
     @Override
     public void setHeading(Angle heading) {
         super.setHeading(heading);
-        switch (linkState) {
-        case LINKED:
-        case ANTILINKED:
+        if (linkState != LinkedViewState.UNLINKED) {
             /*
              * Heading is the same for linked/antilinked views.
              */
             for (LinkedView view : linkedViews) {
                 view.setLinkedHeading(heading);
             }
-            break;
-        case UNLINKED:
-            /*
-             * For unlinked, we don't set the other view's headings
-             */
-            break;
         }
     }
 
+    /**
+     * Called by other {@link LinkedView}s when their heading changes
+     * 
+     * @param heading
+     *            The new heading
+     */
     private void setLinkedHeading(Angle heading) {
-        switch (linkState) {
-        case LINKED:
-        case ANTILINKED:
+        if (linkState != LinkedViewState.UNLINKED) {
+            /*
+             * Heading is the same for linked/antilinked views
+             */
             super.setHeading(heading);
             firePropertyChange(AVKey.VIEW, null, this);
-            break;
-        case UNLINKED:
-            /*
-             * For unlinked, we don't allow other views to set our heading
-             */
-            break;
         }
     }
 
     @Override
     public void setPitch(Angle pitch) {
         super.setPitch(pitch);
-        switch (linkState) {
-        case ANTILINKED:
-        case LINKED:
+        if (linkState != LinkedViewState.UNLINKED) {
             for (LinkedView view : linkedViews) {
                 view.setLinkedPitch(pitch);
             }
-            break;
-        case UNLINKED:
-            break;
         }
     }
 
+    /**
+     * Called by other {@link LinkedView}s when their pitch changes
+     * 
+     * @param pitch
+     *            The new pitch
+     */
     private void setLinkedPitch(Angle pitch) {
         if (linkState != LinkedViewState.UNLINKED) {
+            /*
+             * Pitch is the same for linked/antilinked views
+             */
             super.setPitch(pitch);
             firePropertyChange(AVKey.VIEW, null, this);
         }
@@ -210,27 +249,26 @@ public class LinkedView extends BasicOrbitView {
     @Override
     public void setZoom(double zoom) {
         super.setZoom(zoom);
-        switch (linkState) {
-        case LINKED:
-        case ANTILINKED:
+        if (linkState != LinkedViewState.UNLINKED) {
+            /*
+             * Zoom is the same for linked/antilinked views
+             */
             for (LinkedView view : linkedViews) {
                 view.setLinkedZoom(zoom);
             }
-            break;
-        case UNLINKED:
-            break;
         }
     }
 
+    /**
+     * Called by other {@link LinkedView}s when their zoom changes
+     * 
+     * @param zoom
+     *            The new zoom
+     */
     private void setLinkedZoom(double zoom) {
-        switch (linkState) {
-        case LINKED:
-        case ANTILINKED:
+        if (linkState != LinkedViewState.UNLINKED) {
             super.setZoom(zoom);
             firePropertyChange(AVKey.VIEW, null, this);
-            break;
-        case UNLINKED:
-            break;
         }
     }
 }

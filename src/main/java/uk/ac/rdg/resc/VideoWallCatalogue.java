@@ -28,7 +28,9 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.Configuration;
 import gov.nasa.worldwind.geom.Position;
+import gov.nasa.worldwind.util.Logging;
 
 import java.io.File;
 import java.io.IOException;
@@ -66,14 +68,34 @@ import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
 import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
+import uk.ac.rdg.resc.logging.RescLogging;
 
+/**
+ * A class to manage all of the datasets available for the video wall software.
+ * This extends {@link NcwmsCatalogue} to provide some extra caching ability as
+ * well as additional functionality required only for the video wall.
+ * 
+ * @author Guy Griffiths
+ */
 public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage, FeatureCatalogue {
+    /** The root of the layer menu */
     private final LayerMenuItem rootMenuNode;
-
+    /** A cache of gridded features, for fast loading */
     private Map<String, GridFeature> gridFeatures;
 
     public VideoWallCatalogue() throws IOException, JAXBException {
-        super(NcwmsConfig.readFromFile(new File("/home/guy/.ncWMS-edal/config.xml")));
+        /*
+         * Create a catalogue from the config.xml file specified in the
+         * configuration.
+         * 
+         * If the config file doesn't exist it will be created with no datasets
+         * 
+         * If no config file is specified in the WW config, create it at
+         * ~/edalVideoWall/config.xml
+         */
+        super(NcwmsConfig.readFromFile(new File(Configuration.getStringValue(
+                "uk.ac.rdg.resc.edal.multiglobe.CatalogueLocation", System.getProperty("user.home")
+                        + "/.edalVideoWall/config.xml"))));
 
         gridFeatures = new HashMap<>();
 
@@ -84,42 +106,53 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
     public void datasetLoaded(Dataset dataset, Collection<NcwmsVariable> variables) {
         super.datasetLoaded(dataset, variables);
 
+        /*
+         * For any variables which map to gridded features, preload into memory
+         */
         for (NcwmsVariable variable : variables) {
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
                     .getMapFeatureType(variable.getId());
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
                 /*
                  * This preloads features in memory. Speeds up operation, but
-                 * slows loading
+                 * slows loading. This is usually commented out during
+                 * development, but should be uncommented during production
                  */
-                //                try {
-                //                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
-                //                    gridFeatures.put(layerName, gridFeature);
-                //                } catch (DataReadingException e) {
-                //                    /*
-                //                     * TODO log this properly, and ignore can't read data, but
-                //                     * maybe it will work later...
-                //                     * 
-                //                     * Or just make this layer unavailable...
-                //                     */
-                //                    e.printStackTrace();
-                //                }
+//                try {
+//                    String layerName = getLayerName(dataset.getId(), variable.getId());
+//                    GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
+//                    gridFeatures.put(layerName, gridFeature);
+//                } catch (DataReadingException e) {
+//                    /*
+//                     * TODO log this properly, and ignore can't read data, but
+//                     * maybe it will work later...
+//                     * 
+//                     * Or just make this layer unavailable...
+//                     */
+//                    e.printStackTrace();
+//                    String message = RescLogging.getMessage("resc.DataReadingProblem");
+//                    Logging.logger().warning(message);
+//                }
             } else {
                 /*
-                 * Not a grid feature. For now we ignore it and retrieve as
-                 * normal, but we may want to add different methods for
-                 * point/profile feature
+                 * Not a grid feature dataset. Currently no caching is
+                 * implemented (at this level) for non-gridded features.
+                 * 
+                 * If caching is required, implement it here
                  */
             }
         }
         System.out.println(dataset.getId() + " loaded");
+        /*
+         * Update the menu
+         */
         addDatasetToMenu(dataset);
     }
 
     @Override
     public FeaturesAndMemberName getFeaturesForLayer(String id, PlottingDomainParams params)
             throws EdalException {
-        String varId = getVariableIdFromLayerName(id);
+        String varId = getVariableFromId(id);
         if (gridFeatures.containsKey(id)) {
             /*
              * If we have an in-memory grid feature, just extract a subset of it
@@ -129,6 +162,9 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                     params.getTargetT());
             return new FeaturesAndMemberName(CollectionUtils.setOf(mapFeature), varId);
         } else {
+            /*
+             * We have a non-cached layer, so extract it
+             */
             Dataset dataset = getDatasetFromLayerName(id);
 
             Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
@@ -141,7 +177,7 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
             Extent<Double> zRange, Extent<DateTime> tRange, double sensitivity)
             throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
-        String varId = getVariableIdFromLayerName(layerId);
+        String varId = getVariableFromId(layerId);
         Collection<? extends DiscreteFeature<?, ?>> mapFeatures = dataset.extractMapFeatures(
                 CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1, new BoundingBoxImpl(
                         position.longitude.degrees - sensitivity, position.latitude.degrees
@@ -166,17 +202,57 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
         }
     }
 
+    /**
+     * Returns a {@link List} of {@link ProfileFeature}s extracted from the
+     * given layer.
+     * 
+     * @param layerId
+     *            The layer to extract from
+     * @param position
+     *            The target {@link Position} to extract features from
+     * @param sensitivity
+     *            The range, in degrees, around the target position to extract
+     *            features from
+     * @param elevationRange
+     *            An {@link Extent} representing elevation. All extracted
+     *            profiles will have a domain which intersects this
+     * @param timeRange
+     *            An {@link Extent} representing time. All extracted profiles
+     *            will have a time which falls within this, unless it is a
+     *            zero-width range in which case gridded features will extract
+     *            the nearest profiles (in time) and non-gridded will extract
+     *            exact time matches
+     * @return A {@link List} of extracted features
+     * @throws EdalException
+     *             If there is a problem extracting the profiles
+     */
     public List<? extends ProfileFeature> getProfiles(String layerId, Position position,
-            Extent<Double> elevationRange, Extent<DateTime> timeRange, double sensitivity)
+            double sensitivity, Extent<Double> elevationRange, Extent<DateTime> timeRange)
             throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
-        String varId = getVariableIdFromLayerName(layerId);
+        String varId = getVariableFromId(layerId);
         if (!dataset.supportsProfileFeatureExtraction(varId)) {
             /*
-             * Profile features not supported
+             * Profile features not supported for this dataset/variable
+             * combination, return an empty list
              */
+            String message = RescLogging.getMessage("resc.UnsupportedProfileExtraction");
+            Logging.logger().warning(message);
             return new ArrayList<>();
         } else {
+            /*
+             * Extract features from the dataset
+             */
+            DateTime targetT = null;
+            if (timeRange != null && timeRange.getLow().equals(timeRange.getHigh())) {
+                /*
+                 * If no range is selected on the time slider, we don't want to
+                 * have exact matches only for gridded features, so we nullify
+                 * the time range
+                 */
+                targetT = timeRange.getLow();
+                timeRange = null;
+            }
             List<? extends ProfileFeature> profileFeatures = dataset.extractProfileFeatures(
                     CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1,
                             new BoundingBoxImpl(position.longitude.degrees - sensitivity,
@@ -186,31 +262,75 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                                     DefaultGeographicCRS.WGS84), elevationRange, timeRange,
                             new HorizontalPosition(position.longitude.degrees,
                                     position.latitude.degrees, DefaultGeographicCRS.WGS84), null,
-                            null));
+                            targetT));
             return profileFeatures;
         }
     }
 
-    public Collection<? extends PointSeriesFeature> getTimeseries(String layerId,
-            Position position, Double elevation) throws EdalException {
+    /**
+     * Returns a {@link List} of {@link PointSeriesFeature}s extracted from the
+     * given layer.
+     * 
+     * @param layerId
+     *            The layer to extract from
+     * @param position
+     *            The target {@link Position} to extract features from
+     * @param sensitivity
+     *            The range, in degrees, around the target position to extract
+     *            features from
+     * @param elevationRange
+     *            An {@link Extent} representing elevation. All extracted
+     *            {@link PointSeriesFeature}s will have an elevation which falls
+     *            within this, unless it is a zero-width range in which case
+     *            gridded features will extract the nearest series' (in
+     *            elevation) and non-gridded will extract exact elevation
+     *            matches
+     * @param timeRange
+     *            An {@link Extent} representing time. All extracted features
+     *            will have a time extent which intersects with this
+     * @return A {@link List} of extracted features
+     * @throws EdalException
+     *             If there is a problem extracting the timeseries features
+     */
+    public List<? extends PointSeriesFeature> getTimeseries(String layerId, Position position,
+            double sensitivity, Extent<Double> elevationRange, Extent<DateTime> timeRange)
+            throws EdalException {
         Dataset dataset = getDatasetFromLayerName(layerId);
-        String varId = getVariableIdFromLayerName(layerId);
-        VariableMetadata variableMetadata = dataset.getVariableMetadata(varId);
-        Double surface = GISUtils
-                .getClosestElevationToSurface(variableMetadata.getVerticalDomain());
-        try {
-            Collection<? extends PointSeriesFeature> timeseriesFeatures = dataset
+        String varId = getVariableFromId(layerId);
+        if (!dataset.supportsTimeseriesExtraction(varId)) {
+            /*
+             * Timeseries features not supported for this dataset/variable
+             * combination, return an empty list
+             */
+            String message = RescLogging.getMessage("resc.UnsupportedTimeseriesExtraction");
+            Logging.logger().warning(message);
+            return new ArrayList<>();
+        } else {
+            /*
+             * Extract features from the dataset
+             */
+            Double targetZ = null;
+            if (elevationRange != null && elevationRange.getLow().equals(elevationRange.getHigh())) {
+                /*
+                 * If no range is selected on the time slider, we don't want to
+                 * have exact matches only for gridded features, so we nullify
+                 * the time range
+                 */
+                targetZ = elevationRange.getLow();
+                elevationRange = null;
+            }
+            List<? extends PointSeriesFeature> pointseriesFeatures = dataset
                     .extractTimeseriesFeatures(CollectionUtils.setOf(varId),
-                            new PlottingDomainParams(1, 1, null, null, null,
+                            new PlottingDomainParams(1, 1, new BoundingBoxImpl(
+                                    position.longitude.degrees - sensitivity,
+                                    position.latitude.degrees - sensitivity,
+                                    position.longitude.degrees + sensitivity,
+                                    position.latitude.degrees + sensitivity,
+                                    DefaultGeographicCRS.WGS84), elevationRange, timeRange,
                                     new HorizontalPosition(position.longitude.degrees,
                                             position.latitude.degrees, DefaultGeographicCRS.WGS84),
-                                    surface, null));
-            return timeseriesFeatures;
-        } catch (UnsupportedOperationException e) {
-            /*
-             * Timeseries feature not supported.
-             */
-            return new ArrayList<>();
+                                    targetZ, null));
+            return pointseriesFeatures;
         }
     }
 
@@ -226,7 +346,7 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
     public VariableMetadata getVariableMetadataForLayer(String layerName)
             throws WmsLayerNotFoundException {
         Dataset dataset = getDatasetFromLayerName(layerName);
-        String variableFromId = getVariableIdFromLayerName(layerName);
+        String variableFromId = getVariableFromId(layerName);
         if (dataset != null && variableFromId != null) {
             return dataset.getVariableMetadata(variableFromId);
         } else {
@@ -235,10 +355,20 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
         }
     }
 
-    public LayerMenuItem getEdalLayers() {
+    /**
+     * @return The root {@link LayerMenuItem} for the menu of the available
+     *         layers
+     */
+    public LayerMenuItem getLayerMenu() {
         return rootMenuNode;
     }
 
+    /**
+     * Adds a {@link Dataset} to the menu
+     * 
+     * @param dataset
+     *            The {@link Dataset} to add
+     */
     private void addDatasetToMenu(Dataset dataset) {
         LayerMenuItem datasetNode = new LayerMenuItem(config.getDatasetInfo(dataset.getId())
                 .getTitle(), dataset.getId(), false);
@@ -250,6 +380,13 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
         rootMenuNode.addChildItem(datasetNode);
     }
 
+    /**
+     * Recursively creates a node in the layer menu
+     * 
+     * @param metadata
+     *            The {@link VariableMetadata} to extract the title and ID from
+     * @return
+     */
     private LayerMenuItem createMenuNode(VariableMetadata metadata) {
         String layerId = getLayerName(metadata);
         LayerMenuItem variableNode = new LayerMenuItem(layerMetadata.get(layerId).getTitle(),
@@ -272,24 +409,32 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
         return datasets.get(layerParts[0]);
     }
 
-    public String getVariableIdFromLayerName(String layerName) throws WmsLayerNotFoundException {
-        String[] layerParts = layerName.split("/");
-        if (layerParts.length != 2) {
-            throw new WmsLayerNotFoundException(
-                    "The WMS layer name is malformed.  It should be of the form \"dataset/variable\"");
-        }
-        return layerParts[1];
-    }
-
-    private String getLayerName(VariableMetadata metadata) {
-        return getLayerName(metadata.getDataset().getId(), metadata.getId());
-    }
-
     @Override
     public String getLayerName(String datasetId, String variableId) {
         return datasetId + "/" + variableId;
     }
 
+    /**
+     * Convenience method to get a layer name from {@link VariableMetadata}
+     * 
+     * @param metadata
+     *            The {@link VariableMetadata} object to get the layer name for.
+     * @return The resulting layer name
+     */
+    private String getLayerName(VariableMetadata metadata) {
+        return getLayerName(metadata.getDataset().getId(), metadata.getId());
+    }
+
+    /**
+     * Determine whether a particular layer represents gridded data or not
+     * 
+     * @param layerName
+     *            The layer ID to test
+     * @return <code>true</code> if this layer is gridded
+     * @throws WmsLayerNotFoundException
+     *             If the layer does not exist in this
+     *             {@link VideoWallCatalogue}
+     */
     public boolean layerIsGridded(String layerName) throws WmsLayerNotFoundException {
         return getVariableMetadataForLayer(layerName) instanceof GridVariableMetadata;
     }

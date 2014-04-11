@@ -28,6 +28,9 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.Model;
+import gov.nasa.worldwind.View;
+import gov.nasa.worldwind.WorldWindow;
 import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
 import gov.nasa.worldwind.geom.Position;
 
@@ -36,11 +39,17 @@ import java.awt.event.MouseListener;
 
 import uk.ac.rdg.resc.input.RescInputHandler;
 
+/**
+ * A {@link WorldWindow} which guarantees that the {@link Model} it contains is
+ * an instance of a {@link RescModel}, and the {@link View} is an instance of
+ * {@link LinkedView} (the config option to control the view type is also
+ * overridden in the main {@link VideoWall} class)
+ * 
+ * @author Guy Griffiths
+ */
 @SuppressWarnings("serial")
 public class RescWorldWindow extends WorldWindowGLCanvas {
-    private final LinkedView linkedView;
-
-    public RescWorldWindow(LinkedView linkedView) {
+    public RescWorldWindow() {
         super();
 
         /*
@@ -53,9 +62,10 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
         rescInputHandler.setEventSource(this);
         setInputHandler(rescInputHandler);
 
-        this.linkedView = linkedView;
-        setView(this.linkedView);
-
+        /*
+         * We need to add a listener for clicks on the globe to display
+         * information and graphs when layers are clicked
+         */
         addMouseListener(new MouseListener() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -86,8 +96,18 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
         });
     }
 
-    public LinkedView getLinkedView() {
-        return linkedView;
+    @Override
+    public LinkedView getView() {
+        return (LinkedView) super.getView();
+    }
+
+    @Override
+    public void setView(View view) {
+        if (!(view instanceof LinkedView)) {
+            throw new IllegalArgumentException(
+                    "To use a RescWorldWindow, the View must be an instance of LinkedView");
+        }
+        super.setView(view);
     }
 
     @Override
@@ -95,9 +115,11 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
         return (RescModel) super.getModel();
     }
 
-    public void setModel(RescModel model) {
+    @Override
+    public void setModel(Model model) {
         if (!(model instanceof RescModel)) {
-            throw new IllegalArgumentException("Only RescModels can be used in RescWorldWindows");
+            throw new IllegalArgumentException(
+                    "To use a RescWorldWindow, the Model must be an instance of RescModel");
         }
         super.setModel(model);
     }

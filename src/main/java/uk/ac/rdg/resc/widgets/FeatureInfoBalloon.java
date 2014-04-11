@@ -54,32 +54,74 @@ import java.text.DecimalFormat;
 
 import uk.ac.rdg.resc.RescWorldWindow;
 
+/**
+ * A balloon to be attached to the globe which shows various information about
+ * the data value at that point (including timeseries/depth graphs if
+ * appropriate)
+ * 
+ * @author Guy Griffiths
+ */
 public class FeatureInfoBalloon extends DialogAnnotation implements SelectListener {
     public static final DecimalFormat NUMBER_3DP = new DecimalFormat("#0.000");
+    /** The desired width of the preview graph */
     public static final int TARGET_WIDTH = 300;
+    /** The desired height of the preview graph */
     public static final int TARGET_HEIGHT = 150;
+    /**
+     * The amount the preview image should be scaled (so that it looks like a
+     * preview not just a small graph
+     */
     public static final double PREVIEW_SCALE = 0.5;
 
+    /** The image to use for the close button */
     private static final String RESC_CLOSE_IMAGE_PATH = "images/closeBubble.png";
 
+    /**
+     * A reference to the containing {@link RescWorldWindow}, used so that this
+     * {@link FeatureInfoBalloon} can close itself
+     */
     private RescWorldWindow wwd;
+    /** The {@link AnnotationLayer} to display the balloon on */
     private AnnotationLayer balloonLayer;
+    /** The {@link AnnotationLayer} to display full screen graphs on */
     private AnnotationLayer graphLayer;
 
+    /** The title for the balloon */
     private ScreenAnnotation titleLabel;
 
+    /** The info label (usually the data value) */
     private ScreenAnnotation infoLabel = null;
+    /** The preview of the timeseries graph */
     private ImageAnnotation timeseriesGraph = null;
+    /** The location of the full-sized timeseries graph image */
     private String timeseriesFullPath = null;
+    /** The preview of the depth profile graph */
     private ImageAnnotation profileGraph = null;
+    /** The location of the full-size profile graph image */
     private String profileFullPath = null;
 
+    /** The close button for the full screen graph */
     private ImageAnnotation closeFullScreen;
+    /** The full screen graph */
     private ScreenAnnotation fullScreenGraph = null;
 
+    /** Panel to hold content */
     private Annotation featureInfoContent;
 
-    public FeatureInfoBalloon(Position position, RescWorldWindow wwd, AnnotationLayer balloonLayer, AnnotationLayer graphLayer) {
+    /**
+     * Creates a new {@link FeatureInfoBalloon}
+     * 
+     * @param position
+     *            The position on the globe to display the annotation
+     * @param wwd
+     *            The {@link RescWorldWindow} which this balloon belongs to
+     * @param balloonLayer
+     *            The {@link AnnotationLayer} to display the balloon on
+     * @param graphLayer
+     *            The {@link AnnotationLayer} to display the full-sized graph on
+     */
+    public FeatureInfoBalloon(Position position, RescWorldWindow wwd, AnnotationLayer balloonLayer,
+            AnnotationLayer graphLayer) {
         super(position);
 
         this.wwd = wwd;
@@ -95,6 +137,9 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
          */
         setAlwaysOnTop(true);
 
+        /*
+         * Make this listen to select events
+         */
         wwd.addSelectListener(this);
     }
 
@@ -109,9 +154,15 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         busyImage = new BusyImage(BUSY_IMAGE_PATH);
     }
 
+    /**
+     * Initialises all of the components
+     */
     protected void initFeatureInfoComponents() {
         closeFullScreen = new ButtonAnnotation(RESC_CLOSE_IMAGE_PATH, DEPRESSED_MASK_PATH);
 
+        /*
+         * Set the title to display the clicked location
+         */
         StringBuilder title = new StringBuilder();
         title.append("Clicked (");
         title.append(NUMBER_3DP.format(position.latitude.degrees));
@@ -127,20 +178,29 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         attribs.setTextAlign(AVKey.CENTER);
         attribs.setInsets(new Insets(0, 0, 0, 32));
 
+        /*
+         * Now set up the content panels. They start off empty
+         */
         featureInfoContent = new ScreenAnnotation("", new java.awt.Point());
         this.setupContainer(featureInfoContent);
-        featureInfoContent.setLayout(new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.CENTER, 0, 4)); // hgap, vgap
+        featureInfoContent.setLayout(new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.CENTER, 0, 4));
 
         ScreenAnnotation balloonContent = new ScreenAnnotation("", new java.awt.Point());
         this.setupContainer(balloonContent);
-        balloonContent.setLayout(new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.CENTER, 0, 16)); // hgap, vgap
+        balloonContent.setLayout(new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.CENTER, 0, 16));
         balloonContent.addChild(this.titleLabel);
         balloonContent.addChild(featureInfoContent);
 
         addChild(balloonContent);
     }
 
-    public void setValueText(String valueText) {
+    /**
+     * Sets the text of the info label. Usually this will be the data value
+     * 
+     * @param valueText
+     *            The text to set
+     */
+    public void setInfoText(String valueText) {
         infoLabel = new ScreenAnnotation(valueText, new Point());
         setupLabel(infoLabel);
         AnnotationAttributes attribs = infoLabel.getAttributes();
@@ -150,9 +210,23 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         layoutFeatureInfoComponents();
     }
 
+    /**
+     * Sets the graphs. If either path is <code>null</code>, it is assumed that
+     * no graph is available, so none is plotted.
+     * 
+     * @param profilePath
+     *            The path to the profile graph (within the WorldWind data
+     *            FileStore)
+     * @param timeseriesPath
+     *            The path to the timeseries graph (within the WorldWind data
+     *            FileStore)
+     */
     public void setGraphs(String profilePath, String timeseriesPath) {
         if (profilePath != null) {
             profileFullPath = profilePath;
+            /*
+             * Set a preview image and scale it
+             */
             URL profileFile = WorldWind.getDataFileStore()
                     .findFile(profilePath + "-preview", false);
             if (profileFile != null) {
@@ -165,6 +239,9 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         }
         if (timeseriesPath != null) {
             timeseriesFullPath = timeseriesPath;
+            /*
+             * Set a preview image and scale it
+             */
             URL timeseriesFile = WorldWind.getDataFileStore().findFile(timeseriesPath + "-preview",
                     false);
             if (timeseriesFile != null) {
@@ -177,14 +254,17 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         layoutFeatureInfoComponents();
     }
 
+    /**
+     * Adds the info label and graphs if they are present
+     */
     protected void layoutFeatureInfoComponents() {
         featureInfoContent.removeAllChildren();
         if (infoLabel != null) {
             featureInfoContent.addChild(infoLabel);
         }
         ScreenAnnotation graphPanel = new ScreenAnnotation("", new java.awt.Point());
-        this.setupContainer(graphPanel);
-        graphPanel.setLayout(new AnnotationFlowLayout(AVKey.HORIZONTAL, AVKey.CENTER, 4, 0)); // hgap, vgap
+        setupContainer(graphPanel);
+        graphPanel.setLayout(new AnnotationFlowLayout(AVKey.HORIZONTAL, AVKey.CENTER, 4, 0));
         boolean graphs = false;
         if (timeseriesGraph != null) {
             graphPanel.addChild(timeseriesGraph);
@@ -214,12 +294,15 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                     balloonLayer.removeAnnotation(FeatureInfoBalloon.this);
                     wwd.removeSelectListener(this);
                 } else if (selectObj == profileGraph) {
-                    addFullScreenAnnotation(profileFullPath);
+                    /* Display the profile graph full-sized */
+                    showFullScreenGraph(profileFullPath);
                 } else if (selectObj == timeseriesGraph) {
-                    addFullScreenAnnotation(timeseriesFullPath);
+                    /* Display the timeseries graph full-sized */
+                    showFullScreenGraph(timeseriesFullPath);
                 } else if (selectObj == closeFullScreen) {
                     /*
-                     * Set this balloon to be always on top again
+                     * Set this balloon to be always on top again and remove the
+                     * full screen graph
                      */
                     setAlwaysOnTop(true);
                     graphLayer.removeAnnotation(fullScreenGraph);
@@ -227,6 +310,9 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                 }
                 event.getMouseEvent().consume();
             } else if (event.getEventAction().equals(SelectEvent.ROLLOVER)) {
+                /*
+                 * TODO This may need to be centralised to avoid conflicts
+                 */
                 if (selectObj == profileGraph || selectObj == timeseriesGraph) {
                     ((Component) wwd).setCursor(new Cursor(Cursor.HAND_CURSOR));
                     event.consume();
@@ -237,7 +323,13 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         }
     }
 
-    private void addFullScreenAnnotation(String imagePath) {
+    /**
+     * Displays the full screen graph
+     * 
+     * @param imagePath
+     *            The path to the image to display
+     */
+    private void showFullScreenGraph(String imagePath) {
         if (fullScreenGraph != null) {
             /*
              * We are already displaying a full screen annotation

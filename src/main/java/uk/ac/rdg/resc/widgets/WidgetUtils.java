@@ -32,7 +32,13 @@ import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.render.AnnotationAttributes;
 
 import java.awt.Color;
+import java.awt.Insets;
 
+/**
+ * Static utility methods for setting up various properties of widgets
+ *
+ * @author Guy Griffiths
+ */
 public class WidgetUtils {
     protected static void setupContainerAttributes(AnnotationAttributes attributes) {
         Color transparentBlack = new Color(0, 0, 0, 0);
@@ -51,5 +57,15 @@ public class WidgetUtils {
          */
         attributes.setAdjustWidthToText(AVKey.SIZE_FIXED);
         attributes.setSize(new java.awt.Dimension(0, 0));
+    }
+    
+    public static void setDefaultButtonAttributes(AnnotationAttributes attrs) {
+        attrs.setAdjustWidthToText(AVKey.SIZE_FIXED);
+        attrs.setTextAlign(AVKey.CENTER);
+        attrs.setBackgroundColor(Color.black);
+        attrs.setTextColor(Color.white);
+        attrs.setCornerRadius(10);
+        attrs.setBorderWidth(1);
+        attrs.setInsets(new Insets(10, 0, 10, 0));
     }
 }

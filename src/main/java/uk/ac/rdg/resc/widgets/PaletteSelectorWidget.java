@@ -65,25 +65,43 @@ import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
  */
 public class PaletteSelectorWidget extends ScreenAnnotation implements SelectListener {
 
-    /* The horizontal gap to use in annotation flow layouts */
+    /** The gap to use between elements */
     private static final int GAP = 4;
-    /* The width of the colourbar in the main palette window */
+    /** The width of the colourbar in the main palette window */
     private static final int COLOURBAR_WIDTH = 35;
-    /* The border to use at the edges */
+    /** The border to use at the edges */
     private static final int BORDER = 10;
 
+    /*
+     * Button images
+     */
     private static final String OK_IMAGE = "images/ok_button.png";
     private static final String CLOSE_IMAGE = "images/close_button.png";
 
+    /** Transparent, for convenience */
     private static final Color TRANSPARENT_COLOR = new Color(0, true);
 
+    /**
+     * The object which will receive events from this
+     * {@link PaletteSelectorWidget}
+     */
     private PaletteSelectionHandler handler;
+    /** The {@link EdalConfigLayer} containing this {@link PaletteSelectorWidget} */
     private EdalConfigLayer parentLayer;
 
+    /**
+     * The last width of the {@link PaletteSelectorWidget}, used to recalculate
+     * colour bars if it changes
+     */
     private int lastItemWidth = -1;
+    /** Used to modify values by dragging */
     private Point lastDragPoint = null;
+    /** Used to trigger a redraw if the palette changes */
     private boolean paletteChanged = false;
 
+    /*
+     * Various elements of the palette selector
+     */
     private ScreenAnnotation titleAnnotation;
 
     private ScreenAnnotation colourBarPanel;
@@ -108,6 +126,7 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
     private ScreenAnnotation paletteChooser;
     private Map<ImageAnnotation, Runnable> paletteImages = new HashMap<>();
 
+    private ScreenAnnotation nColoursPanel;
     private Map<ScreenAnnotation, Integer> nColoursLabels = new HashMap<>();
 
     /*
@@ -120,7 +139,6 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
     private int numColourBands = 250;
     private Color belowMinColour = Color.black;
     private Color aboveMaxColour = Color.black;
-    private Color noDataColour = TRANSPARENT_COLOR;
 
     /*
      * The state of the palette when it was first displayed (used to reset if a
@@ -133,12 +151,22 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
     private int lastNumColourBands = ColourPalette.MAX_NUM_COLOURS;
     private Color lastBelowMinColour = Color.black;
     private Color lastAboveMaxColour = Color.black;
-//    private Color lastNoDataColour = TRANSPARENT_COLOR;
 
+    /**
+     * The {@link ColourScheme} which encapsulates the palette settings. Used to
+     * generate colourbars
+     */
     private ColourScheme colourScheme;
 
-    //    private Map<ScreenAnnotation, Runnable> pickableItems;
-
+    /**
+     * Creates a new {@link PaletteSelectorWidget}
+     * 
+     * @param wwd
+     *            The containing {@link RescWorldWindow}
+     * @param parentLayer
+     *            The {@link EdalConfigLayer} to which this
+     *            {@link PaletteSelectorWidget} belongs
+     */
     public PaletteSelectorWidget(RescWorldWindow wwd, EdalConfigLayer parentLayer) {
         super("", new Point());
 
@@ -147,9 +175,12 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         initialise();
     }
 
+    /**
+     * Initialises and lays out the palette selector components
+     */
     private void initialise() {
         titleAnnotation = new ScreenAnnotation("Adjust Colour Scale", new Point());
-        setDefaultButtonAttributes(titleAnnotation.getAttributes());
+        WidgetUtils.setDefaultButtonAttributes(titleAnnotation.getAttributes());
         titleAnnotation.getAttributes().setFont(new Font("SansSerif", Font.BOLD, 16));
 
         setLayout(new AnnotationFlowLayout(AVKey.VERTICAL, AVKey.CENTER, 0, GAP));
@@ -186,17 +217,17 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
 
         minLabel = new ScreenAnnotation("", new Point());
         minLabel.setPickEnabled(true);
-        setDefaultButtonAttributes(minLabel.getAttributes());
+        WidgetUtils.setDefaultButtonAttributes(minLabel.getAttributes());
         minLabel.getAttributes().setSize(new Dimension(100, 0));
 
         opacityLabel = new ScreenAnnotation("Opacity\n100%", new Point());
         opacityLabel.setPickEnabled(true);
-        setDefaultButtonAttributes(opacityLabel.getAttributes());
+        WidgetUtils.setDefaultButtonAttributes(opacityLabel.getAttributes());
         opacityLabel.getAttributes().setSize(new Dimension(50, 0));
 
         maxLabel = new ScreenAnnotation("", new Point());
         maxLabel.setPickEnabled(true);
-        setDefaultButtonAttributes(maxLabel.getAttributes());
+        WidgetUtils.setDefaultButtonAttributes(maxLabel.getAttributes());
         maxLabel.getAttributes().setSize(new Dimension(100, 0));
 
         labelsPanel.addChild(minLabel);
@@ -211,20 +242,13 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         buttonsPanel.getAttributes().setBackgroundColor(new Color(0, true));
 
         cancelButton = new ImageAnnotation(CLOSE_IMAGE);
-        //        cancelButton.getAttributes().setInsets(new Insets(0, BORDER, 0, BORDER));
         cancelButton.setPickEnabled(true);
 
         okButton = new ImageAnnotation(OK_IMAGE);
-        //        okButton.getAttributes().setInsets(new Insets(0, BORDER, 0, BORDER));
         okButton.setPickEnabled(true);
-
-        //        setDefaultButtonAttributes(okButton.getAttributes());
-        //        setDefaultButtonAttributes(cancelButton.getAttributes());
 
         buttonsPanel.addChild(cancelButton);
         buttonsPanel.addChild(okButton);
-
-        //        this.addChild(mainPanel);
 
         paletteChooser = new ScreenAnnotation("", new Point());
         WidgetUtils.setupContainerAttributes(paletteChooser.getAttributes());
@@ -238,25 +262,33 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
                 AVKey.RIGHT, GAP, 0);
         paletteChooserPanel.setLayout(paletteChooserPanelLayout);
 
-        ScreenAnnotation nColoursPanel = new ScreenAnnotation("", new Point());
+        nColoursPanel = new ScreenAnnotation("", new Point());
         WidgetUtils.setupContainerAttributes(nColoursPanel.getAttributes());
         AnnotationFlowLayout nColoursPanelLayout = new AnnotationFlowLayout(AVKey.HORIZONTAL,
                 AVKey.LEFT, GAP, 0);
         nColoursPanel.setLayout(nColoursPanelLayout);
 
         ScreenAnnotation nColoursTitle = new ScreenAnnotation("Colour bands", new Point());
-        setDefaultButtonAttributes(nColoursTitle.getAttributes());
+        WidgetUtils.setDefaultButtonAttributes(nColoursTitle.getAttributes());
+        nColoursTitle.getAttributes().setAdjustWidthToText(AVKey.SIZE_FIT_TEXT);
+        nColoursTitle.getAttributes().getInsets().left = 10;
+        nColoursTitle.getAttributes().getInsets().right = 10;
         nColoursPanel.addChild(nColoursTitle);
+        /*
+         * Buttons to select the number of colour bands. I've chosen sensible
+         * defaults here
+         */
         for (int i : new int[] { 250, 100, 50, 20, 10, 5 }) {
             ScreenAnnotation nColoursLabel = new ScreenAnnotation(i + "", new Point());
             nColoursLabel.setPickEnabled(true);
-            setDefaultButtonAttributes(nColoursLabel.getAttributes());
-            nColoursLabel.getAttributes().setSize(new Dimension(50, 0));
+            WidgetUtils.setDefaultButtonAttributes(nColoursLabel.getAttributes());
+            nColoursLabel.getAttributes().setAdjustWidthToText(AVKey.SIZE_FIT_TEXT);
+            nColoursLabel.getAttributes().getInsets().left = 10;
+            nColoursLabel.getAttributes().getInsets().right = 10;
             nColoursPanel.addChild(nColoursLabel);
             nColoursLabels.put(nColoursLabel, i);
         }
 
-        paletteChooser.addChild(nColoursPanel);
         paletteChooser.addChild(paletteChooserPanel);
         populatePaletteImages();
 
@@ -264,9 +296,16 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         getAttributes().setCornerRadius(10);
         getAttributes().setOpacity(0.8);
 
+        /*
+         * Set the selector to be the main screen (as opposed to the palette
+         * selection)
+         */
         setMainSelector();
     }
 
+    /**
+     * Generates the colour bar images for all available palettes
+     */
     private void populatePaletteImages() {
         paletteChooserPanel.removeAllChildren();
         for (final String palette : ColourPalette.getPredefinedPalettes()) {
@@ -277,6 +316,10 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
             paletteImage.getAttributes().setImageRepeat(AVKey.REPEAT_X);
             paletteImage.setPickEnabled(true);
             paletteChooserPanel.addChild(paletteImage);
+            /*
+             * If a new palette is chosen, send values to the
+             * PaletteSelectionHandler
+             */
             paletteImages.put(paletteImage, new Runnable() {
                 @Override
                 public void run() {
@@ -304,32 +347,55 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         lastLogScaling = logScaling;
         lastMaxScale = maxScale;
         lastMinScale = minScale;
-//        lastNoDataColour = noDataColour;
+        //        lastNoDataColour = noDataColour;
         lastNumColourBands = numColourBands;
         lastPaletteName = paletteName;
     }
 
+    /**
+     * Sets the {@link PaletteSelectorWidget} to the main screen
+     */
     private void setMainSelector() {
         this.removeAllChildren();
         this.addChild(titleAnnotation);
         this.addChild(colourBarPanel);
         this.addChild(labelsPanel);
+        this.addChild(nColoursPanel);
         this.addChild(buttonsPanel);
         paletteChooser.getAttributes().setVisible(false);
     }
 
+    /**
+     * Sets the {@link PaletteSelectorWidget} to the palette chooser
+     */
     private void setPaletteChooser() {
         this.removeAllChildren();
         this.addChild(paletteChooser);
         paletteChooser.getAttributes().setVisible(true);
     }
 
+    /**
+     * @param handler
+     *            The {@link PaletteSelectionHandler} which will receive events
+     */
     public void setPaletteSelectionHandler(PaletteSelectionHandler handler) {
         this.handler = handler;
     }
 
+    /**
+     * Sets the values of all properties of this {@link PaletteSelectorWidget}
+     * 
+     * @param plottingMetadata
+     *            The {@link WmsLayerMetadata} representing the palette values
+     * @param belowMinColour
+     *            The {@link Color} to use for data whose value is below the
+     *            minimum scale value
+     * @param aboveMaxColour
+     *            The {@link Color} to use for data whose value is above the
+     *            maximum scale value
+     */
     public void setPaletteProperties(WmsLayerMetadata plottingMetadata, Color belowMinColour,
-            Color aboveMaxColour, Color noDataColour) {
+            Color aboveMaxColour) {
         setMinScale(plottingMetadata.getColorScaleRange().getLow());
         setMaxScale(plottingMetadata.getColorScaleRange().getHigh());
 
@@ -338,12 +404,15 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         this.numColourBands = plottingMetadata.getNumColorBands();
         this.belowMinColour = belowMinColour;
         this.aboveMaxColour = aboveMaxColour;
-        this.noDataColour = noDataColour;
 
         setupColourScheme();
         setupColourBar(1);
     }
 
+    /**
+     * @param minScale
+     *            The minimum value on the colour scale
+     */
     private void setMinScale(float minScale) {
         if (minScale > maxScale) {
             minScale = maxScale;
@@ -352,6 +421,10 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         minLabel.setText(FeatureInfoBalloon.NUMBER_3DP.format(this.minScale));
     }
 
+    /**
+     * @param maxScale
+     *            The maximum value on the colour scale
+     */
     private void setMaxScale(float maxScale) {
         if (maxScale < minScale) {
             maxScale = minScale;
@@ -360,6 +433,10 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         maxLabel.setText(FeatureInfoBalloon.NUMBER_3DP.format(this.maxScale));
     }
 
+    /**
+     * @param opacity
+     *            The overall opacity of the colour scale
+     */
     private void setOpacity(int opacity) {
         if (opacity < 0) {
             opacity = 0;
@@ -371,6 +448,10 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         opacityLabel.setText("Opacity\n" + opacity + "%");
     }
 
+    /**
+     * @param numColourBands
+     *            The number of colour bands to use
+     */
     private void setNumColourBands(int numColourBands) {
         if (numColourBands < 1) {
             numColourBands = 1;
@@ -383,12 +464,21 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         populatePaletteImages();
     }
 
+    /**
+     * Recalculates the colour scheme.
+     */
     private void setupColourScheme() {
         ColourScale colourScale = new ColourScale(Extents.newExtent(minScale, maxScale), logScaling);
         colourScheme = new SegmentColourScheme(colourScale, belowMinColour, aboveMaxColour,
-                noDataColour, paletteName, numColourBands);
+                TRANSPARENT_COLOR, paletteName, numColourBands);
     }
 
+    /**
+     * Regenerates the colourbar
+     * 
+     * @param length
+     *            The length to draw
+     */
     private void setupColourBar(int length) {
         colourBar.setImageSource(colourScheme.getScaleBar(length, COLOURBAR_WIDTH, 0.0f, false,
                 false, null, null));
@@ -396,6 +486,13 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         setExtremeColour(false);
     }
 
+    /**
+     * Changes the value to use outside of the normal range
+     * 
+     * @param belowMin
+     *            <code>true</code> to setup the colour for below minimum,
+     *            <code>false</code> for above maximum
+     */
     private void setExtremeColour(boolean belowMin) {
         if (belowMin) {
             switch (belowMinState) {
@@ -434,6 +531,9 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         if (event.hasObjects()) {
             Object pickedObj = event.getTopObject();
             if (pickedObj == minLabel || pickedObj == maxLabel || pickedObj == opacityLabel) {
+                /*
+                 * Min value, max value and opacity are changed by dragging
+                 */
                 if (event.isLeftPress()) {
                     lastDragPoint = event.getPickPoint();
                 }
@@ -457,33 +557,63 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
             }
             if (event.isLeftClick()) {
                 if (pickedObj == cancelButton) {
+                    /*
+                     * Cancels the current operation and restores the state
+                     */
                     parentLayer.hidePaletteSelector();
                     if (handler != null) {
                         handler.bulkChange(Extents.newExtent(lastMinScale, lastMaxScale),
                                 lastPaletteName, lastBelowMinColour, lastAboveMaxColour,
                                 lastLogScaling, lastNumColourBands);
+                        minScale = lastMinScale;
+                        maxScale = lastMaxScale;
+                        paletteName = lastPaletteName;
+                        belowMinColour = lastBelowMinColour;
+                        aboveMaxColour = lastAboveMaxColour;
+                        logScaling = lastLogScaling;
+                        numColourBands = lastNumColourBands;
                     }
                 } else if (pickedObj == okButton) {
+                    /*
+                     * Just hide the selector - all changes have already passed
+                     * to the palette handler
+                     */
                     parentLayer.hidePaletteSelector();
                 } else if (pickedObj == aboveMax) {
+                    /*
+                     * Cycle through out-of-range states for above max
+                     */
                     aboveMaxState = aboveMaxState.getNext();
                     setExtremeColour(false);
                     if (handler != null) {
                         handler.aboveMaxColourChanged(aboveMaxColour);
                     }
                 } else if (pickedObj == belowMin) {
+                    /*
+                     * Cycle through out-of-range states for above max
+                     */
                     belowMinState = belowMinState.getNext();
                     setExtremeColour(true);
                     if (handler != null) {
                         handler.belowMinColourChanged(belowMinColour);
                     }
                 } else if (pickedObj == colourBar) {
+                    /*
+                     * If the colourbar is clicked, show the different available
+                     * palettes
+                     */
                     setPaletteChooser();
                 } else if (paletteImages.containsKey(pickedObj)) {
+                    /*
+                     * If a new palette is chosed, go back to the main selector
+                     */
                     paletteImages.get(pickedObj).run();
                     paletteChanged = true;
                     setMainSelector();
                 } else if (nColoursLabels.containsKey(pickedObj)) {
+                    /*
+                     * If a new number of colour bands is chosen, set it.
+                     */
                     setNumColourBands(nColoursLabels.get(pickedObj));
                     if (handler != null) {
                         handler.setNumColourBands(numColourBands);
@@ -491,6 +621,9 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
                 }
             } else if (event.isRollover()) {
             } else if (event.isDragEnd()) {
+                /*
+                 * We only change scale limits once dragging is finished
+                 */
                 if (handler != null) {
                     if (pickedObj == minLabel || pickedObj == maxLabel) {
                         handler.scaleLimitsChanged(Extents.newExtent(minScale, maxScale));
@@ -508,6 +641,17 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         int itemWidth = size.width - 2 * BORDER;
 
         if (paletteChooser.getAttributes().isVisible()) {
+            /*
+             * Layout the palette chooser
+             */
+            Annotation nColoursChooser = paletteChooser.getChildren().get(0);
+            int totalUsedWidth = 0;
+            for (Annotation a : nColoursChooser.getChildren()) {
+                totalUsedWidth += a.getPreferredSize(dc).width;
+            }
+            int nItems = nColoursChooser.getChildren().size();
+            ((AnnotationFlowLayout) nColoursChooser.getLayout())
+                    .setHorizontalGap((itemWidth - totalUsedWidth) / (nItems - 1));
             if (!paletteChooserPanel.getChildren().isEmpty()) {
                 int childWidth = itemWidth / paletteChooserPanel.getChildren().size() - GAP;
                 for (Annotation a : paletteChooserPanel.getChildren()) {
@@ -516,6 +660,9 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
                 }
             }
         } else {
+            /*
+             * Layout the main selector
+             */
             if ((paletteChanged || lastItemWidth != itemWidth) && paletteName != null) {
                 lastItemWidth = itemWidth;
                 int colourBarLength = itemWidth - 2 * COLOURBAR_WIDTH;
@@ -527,6 +674,9 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
 
             labelsPanel.getAttributes().setSize(new Dimension(itemWidth, 0));
 
+            /*
+             * Space out the labels to fill the maximum available space
+             */
             int hgap = itemWidth - minLabel.getAttributes().getSize().width
                     - maxLabel.getAttributes().getSize().width
                     - opacityLabel.getAttributes().getSize().width;
@@ -544,16 +694,9 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         attributes.setSize(new Dimension(COLOURBAR_WIDTH, COLOURBAR_WIDTH));
     }
 
-    private static void setDefaultButtonAttributes(AnnotationAttributes attrs) {
-        attrs.setAdjustWidthToText(AVKey.SIZE_FIXED);
-        attrs.setTextAlign(AVKey.CENTER);
-        attrs.setBackgroundColor(Color.black);
-        attrs.setTextColor(Color.white);
-        attrs.setCornerRadius(10);
-        attrs.setBorderWidth(1);
-        attrs.setInsets(new Insets(10, 0, 10, 0));
-    }
-
+    /**
+     * The methods which can be called if a colour scale is changed in some way
+     */
     public interface PaletteSelectionHandler {
         public void scaleLimitsChanged(Extent<Float> newScaleRange);
 
@@ -571,6 +714,9 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
                 Color aboveMax, boolean logScaling, int numColourBands);
     }
 
+    /**
+     * The states used for out-of-range colours
+     */
     private static enum ExtremeState {
         BLACK, EXTEND, TRANSPARENT;
         public ExtremeState getNext() {

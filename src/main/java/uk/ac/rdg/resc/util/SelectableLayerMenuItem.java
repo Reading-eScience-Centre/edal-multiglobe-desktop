@@ -31,6 +31,7 @@ package uk.ac.rdg.resc.util;
 import java.util.AbstractList;
 import java.util.List;
 
+import uk.ac.rdg.resc.EdalDataLayer;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 import uk.ac.rdg.resc.widgets.LayerSelectorWidget;
 
@@ -39,7 +40,10 @@ import uk.ac.rdg.resc.widgets.LayerSelectorWidget;
  * as selected or not. This is used in {@link LayerSelectorWidget} to allow for
  * multiple layers to be selected.
  * 
- * @author Guy
+ * TODO This class is currently not used, but will be useful once we implement
+ * multiple {@link EdalDataLayer}s on a single globe
+ * 
+ * @author Guy Griffiths
  */
 public class SelectableLayerMenuItem extends LayerMenuItem {
     private static final long serialVersionUID = 1L;
@@ -83,7 +87,7 @@ public class SelectableLayerMenuItem extends LayerMenuItem {
 
             @Override
             public int size() {
-                if(SelectableLayerMenuItem.super.getChildren() == null) {
+                if (SelectableLayerMenuItem.super.getChildren() == null) {
                     return 0;
                 }
                 return SelectableLayerMenuItem.super.getChildren().size();
@@ -96,18 +100,36 @@ public class SelectableLayerMenuItem extends LayerMenuItem {
         return (SelectableLayerMenuItem) super.getParent();
     }
 
+    /**
+     * @return Whether or not this item is currently selected
+     */
     public boolean isSelected() {
         return selected;
     }
 
+    /**
+     * Sets the selected state of this menu item
+     * 
+     * @param selected
+     *            Whether this item is selected or not
+     */
     public void setSelected(boolean selected) {
         this.selected = selected;
     }
 
+    /**
+     * @return Whether or not this item represents a gridded field
+     */
     public boolean isGridded() {
         return gridded;
     }
 
+    /**
+     * Sets the gridded state of this menu item
+     * 
+     * @param selected
+     *            Whether this item is gridded or not
+     */
     public void setGridded(boolean gridded) {
         this.gridded = gridded;
     }

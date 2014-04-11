@@ -79,7 +79,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     protected Insets interiorInsets;
 
     private String orientation;
-    SliderWidgetHandler handler;
+    private SliderWidgetHandler handler;
     private Point lastDragPoint = null;
 
     private DoubleBuffer elementBuffer;

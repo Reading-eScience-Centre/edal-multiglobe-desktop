@@ -28,6 +28,10 @@
 
 package uk.ac.rdg.resc;
 
+import gov.nasa.worldwind.Configuration;
+import gov.nasa.worldwind.avlist.AVKey;
+import gov.nasa.worldwind.util.Logging;
+
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Color;
@@ -45,22 +49,49 @@ import javax.xml.bind.JAXBException;
 import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
 import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
+import uk.ac.rdg.resc.logging.RescLogging;
 
+/**
+ * Main class for the multi-globe video wall software.
+ * 
+ * @author Guy Griffiths
+ */
 @SuppressWarnings("serial")
 public class VideoWall extends JFrame {
     private VideoWallCatalogue datasetLoader;
     private MultiGlobeFrame globePanels;
-    //    private RescControlPanel controlPanel;
     private JPanel addRemoveRowPanel;
     private JPanel addRemoveColumnPanel;
 
+    /**
+     * Set up necessary components and loads some buttons into the main panel
+     * for adding/removing globe panels
+     */
     public VideoWall() throws IOException, EdalException, JAXBException {
+        Configuration.setValue(AVKey.VIEW_CLASS_NAME, LinkedView.class.getName());
+        
+        /*
+         * Set the default data reader. This means that we don't need to specify
+         * a dataset factory for cases where we are reading gridded NetCDF data
+         * (the majority)
+         */
         DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
 
+        /*
+         * Initialise the dataset catalogue
+         */
         datasetLoader = new VideoWallCatalogue();
+        /*
+         * Create the main frame which will hold each of the globe panels
+         */
         globePanels = new MultiGlobeFrame(datasetLoader);
 
+        /*
+         * Create and wire up the panel for adding/removing rows
+         */
         addRemoveRowPanel = new JPanel();
+
+        /* The add row button */
         Button addRowButton = new Button("+");
         addRowButton.addActionListener(new ActionListener() {
             @Override
@@ -71,6 +102,8 @@ public class VideoWall extends JFrame {
         addRowButton.setBackground(Color.black);
         addRowButton.setForeground(Color.lightGray);
         addRowButton.setSize(100, 50);
+
+        /* The remove row button */
         Button removeRowButton = new Button("-");
         removeRowButton.addActionListener(new ActionListener() {
             @Override
@@ -84,7 +117,12 @@ public class VideoWall extends JFrame {
         addRemoveRowPanel.add(removeRowButton);
         addRemoveRowPanel.add(addRowButton);
 
+        /*
+         * Create and wire up the panel for adding/removing columns
+         */
         addRemoveColumnPanel = new JPanel();
+
+        /* The add column button */
         Button addColumnButton = new Button("+");
         addColumnButton.addActionListener(new ActionListener() {
             @Override
@@ -94,6 +132,8 @@ public class VideoWall extends JFrame {
         });
         addColumnButton.setBackground(Color.black);
         addColumnButton.setForeground(Color.lightGray);
+
+        /* The remove column button */
         Button removeColumnButton = new Button(" - ");
         removeColumnButton.addActionListener(new ActionListener() {
             @Override
@@ -108,13 +148,14 @@ public class VideoWall extends JFrame {
         addRemoveColumnPanel.add(removeColumnButton);
         addRemoveColumnPanel.add(addColumnButton);
 
+        /*
+         * Now set the main window layout with the main globe panel and the
+         * buttons
+         */
         setLayout(new BorderLayout());
         add(globePanels, BorderLayout.CENTER);
         add(addRemoveColumnPanel, BorderLayout.EAST);
         add(addRemoveRowPanel, BorderLayout.SOUTH);
-
-        //        controlPanel = new RescControlPanel(this, globePanels);
-        //        add(controlPanel, BorderLayout.WEST);
     }
 
     public static void main(String[] args) {
@@ -138,27 +179,36 @@ public class VideoWall extends JFrame {
              */
         }
 
+        /*
+         * Set the config location
+         */
         System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
         java.awt.EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                JFrame frame;
+                JFrame frame = null;
                 try {
+                    /*
+                     * Create a fullscreen application
+                     */
                     frame = new VideoWall();
-                    frame.setUndecorated(true);
-                    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                    frame.pack();
-                    int size = frame.getExtendedState();
-                    size |= Frame.MAXIMIZED_BOTH;
-                    frame.setExtendedState(size);
-                    frame.setVisible(true);
-                } catch (IOException e) {
+                } catch (Exception e) {
+                    /*
+                     * We have a problem instantiating the video wall. This is
+                     * unrecoverable, so log it, print stack trace and exit.
+                     */
+                    String message = RescLogging.getMessage("resc.StartupError");
+                    Logging.logger().severe(message);
                     e.printStackTrace();
-                } catch (EdalException e) {
-                    e.printStackTrace();
-                } catch (JAXBException e) {
-                    e.printStackTrace();
+                    System.exit(0);
                 }
+                frame.setUndecorated(true);
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.pack();
+                int size = frame.getExtendedState();
+                size |= Frame.MAXIMIZED_BOTH;
+                frame.setExtendedState(size);
+                frame.setVisible(true);
             }
         });
     }

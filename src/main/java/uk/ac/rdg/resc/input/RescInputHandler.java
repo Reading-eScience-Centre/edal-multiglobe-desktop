@@ -30,21 +30,14 @@ package uk.ac.rdg.resc.input;
 
 import gov.nasa.worldwind.awt.AWTInputHandler;
 
-import java.awt.event.KeyEvent;
-
 /**
- * An input handler which doens't do anything. Will be extended for multitouch
- * at some point, as well as possibly space mouse and kinect
+ * An input handler which copies all behaviour from {@link AWTInputHandler}.
+ * Will be extended for multitouch at some point, as well as possibly space
+ * mouse and kinect
  * 
- * @author Guy
+ * @author Guy Griffiths
  */
 public class RescInputHandler extends AWTInputHandler {
     public RescInputHandler() {
-    }
-
-    @Override
-    public void keyPressed(KeyEvent e) {
-        //        System.out.println(e);
-        super.keyPressed(e);
     }
 }
