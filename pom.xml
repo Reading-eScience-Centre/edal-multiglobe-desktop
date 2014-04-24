@@ -3,13 +3,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <!-- We inherit from oss-parent so we can deploy to sonatype.org -->
-    <!-- 
-    <parent>
-        <groupId>org.sonatype.oss</groupId>
-        <artifactId>oss-parent</artifactId>
-        <version>7</version>
-    </parent>
-     -->
+    <!-- <parent> <groupId>org.sonatype.oss</groupId> <artifactId>oss-parent</artifactId> 
+        <version>7</version> </parent> -->
     <modelVersion>4.0.0</modelVersion>
     <groupId>uk.ac.rdg.resc</groupId>
     <version>0.1-SNAPSHOT</version>
@@ -103,39 +98,57 @@
                 </configuration>
                 <version>2.9</version>
             </plugin>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>2.4</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/assembly/assembly.xml</descriptor>
+                    </descriptors>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>  <!-- this is used for inheritance merges -->
+                        <phase>verify</phase>  <!-- bind to the verify phase, to execute after package phase -->
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>appassembler-maven-plugin</artifactId>
+                <version>1.7</version>
+                <configuration>
+                    <programs>
+                        <program>
+                            <mainClass>uk.ac.rdg.resc.VideoWall</mainClass>
+                            <id>multiglobe</id>
+                        </program>
+                    </programs>
+                    <repositoryName>lib</repositoryName>
+                    <repositoryLayout>flat</repositoryLayout>
+                    <assembleDirectory>${project.build.directory}/${project.artifactId}</assembleDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-assembly</id>  <!-- this is used for inheritance merges -->
+                        <phase>package</phase>  <!-- bind to the package phase -->
+                        <goals>
+                            <goal>assemble</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
-    <!--
-    <profiles>
-        <profile>
-            <id>release-sign-artifacts</id>
-            <activation>
-                <property>
-                    <name>performRelease</name>
-                    <value>true</value>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.1</version>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-    -->
+    <!-- <profiles> <profile> <id>release-sign-artifacts</id> <activation> 
+        <property> <name>performRelease</name> <value>true</value> </property> </activation> 
+        <build> <plugins> <plugin> <groupId>org.apache.maven.plugins</groupId> <artifactId>maven-gpg-plugin</artifactId> 
+        <version>1.1</version> <executions> <execution> <id>sign-artifacts</id> <phase>verify</phase> 
+        <goals> <goal>sign</goal> </goals> </execution> </executions> </plugin> </plugins> 
+        </build> </profile> </profiles> -->
     <issueManagement>
         <system>Google Code</system>
         <url>https://bitbucket.org/GuyGriffiths/edal-multiglobe-desktop/issues</url>
@@ -214,22 +227,11 @@
         <developerConnection>scm:hg:https://edal-java.googlecode.com/hg/</developerConnection>
         <url>http://code.google.com/p/edal-java/source/browse/</url>
     </scm>
-    <!--
-    <distributionManagement>
-        <repository>
-            <id>edal-java-release</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
-        </repository>
-        <snapshotRepository>
-            <id>edal-snapshots</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <site>
-            <id>sweeney</id>
-            <url>scp://sweeney.nerc-essc.ac.uk/users/resc/website/edal</url>
-        </site>
-    </distributionManagement>
-    -->
+    <!-- <distributionManagement> <repository> <id>edal-java-release</id> 
+        <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url> </repository> 
+        <snapshotRepository> <id>edal-snapshots</id> <url>https://oss.sonatype.org/content/repositories/snapshots</url> 
+        </snapshotRepository> <site> <id>sweeney</id> <url>scp://sweeney.nerc-essc.ac.uk/users/resc/website/edal</url> 
+        </site> </distributionManagement> -->
     <repositories>
         <repository>
             <!-- This allows us to include local maven repos in each module 
@@ -251,7 +253,7 @@
         <repository>
             <id>edal-snapshots</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-       </repository>
+        </repository>
     </repositories>
 
 </project>
