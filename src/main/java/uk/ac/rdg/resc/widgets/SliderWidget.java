@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Copyright (c) 2014 The University of Reading
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the University of Reading, nor the names of the
  *    authors or contributors may be used to endorse or promote products
  *    derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -28,6 +28,7 @@
 
 package uk.ac.rdg.resc.widgets;
 
+import gov.nasa.worldwind.WorldWind;
 import gov.nasa.worldwind.WorldWindow;
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.event.SelectEvent;
@@ -39,26 +40,23 @@ import gov.nasa.worldwind.render.FrameFactory;
 import gov.nasa.worldwind.render.ScreenAnnotation;
 import gov.nasa.worldwind.util.Logging;
 import gov.nasa.worldwind.util.OGLStackHandler;
-import gov.nasa.worldwindx.examples.util.ProgressAnnotation;
-
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Insets;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.nio.DoubleBuffer;
+import uk.ac.rdg.resc.edal.domain.Extent;
+import uk.ac.rdg.resc.edal.util.Extents;
 
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2;
-
-import uk.ac.rdg.resc.edal.domain.Extent;
-import uk.ac.rdg.resc.edal.util.Extents;
+import java.awt.*;
+import java.nio.DoubleBuffer;
 
 /**
  * A {@link ScreenAnnotation} which allows users to slide the bar and add a
  * handler to detect sliding events.
- * 
- * The initial implementation was strongly based on {@link ProgressAnnotation}
+ * <p/>
+ * This {@link SliderWidget} represents a single value as well as a value range
+ * (the selected value +- a range). The range can be adjusted by shift-dragging
+ * the slider (as opposed to normal dragging to change the value)
+ * <p/>
+ * The initial implementation was strongly based on ProgressAnnotation
  */
 public class SliderWidget extends ScreenAnnotation implements SelectListener {
     /*
@@ -67,30 +65,97 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     private static final int CIRCLE_SIZE = 32;
     private static final int CENTRE_SIZE = 8;
 
+    /**
+     * The ID of this slider. This will passed to any handlers
+     */
     final String id;
 
+    /**
+     * true if the right/top of the slider is the lowest value
+     */
     private boolean reversed = false;
+    /**
+     * Current value of the slider
+     */
     protected double value;
+    /**
+     * Current range of the slider
+     */
     protected double valueRange;
+    /**
+     * Minimum value of the slider
+     */
     protected double min;
+    /**
+     * Maximum value of the slider
+     */
     protected double max;
+    /**
+     * Background colour of the slider
+     */
     protected Color backgroundColor;
+    /**
+     * Colour of the indicator element of the slider
+     */
     protected Color elementColor;
-    protected Insets interiorInsets;
 
+    /**
+     * The orientation of the slider. Can be {@link AVKey#HORIZONTAL} or
+     * {@link AVKey#VERTICAL}
+     */
     private String orientation;
+    /**
+     * A {@link SliderWidgetHandler} to send events to when the value/range
+     * changes
+     */
     private SliderWidgetHandler handler;
+    /**
+     * Used to calculate drag amount
+     */
     private Point lastDragPoint = null;
 
+    /**
+     * Graphics buffer for drawing the element
+     */
     private DoubleBuffer elementBuffer;
+    /**
+     * Graphics buffer for drawing the centre of the element
+     */
     private DoubleBuffer centreElementBuffer;
 
+    /**
+     * A timer to measure when the slider has been immobile for a certain amount
+     * of time
+     */
     private Thread sliderTimer = null;
 
+    /**
+     * Instantiate a new {@link SliderWidget}
+     * 
+     * @param id
+     *            The ID of this slider
+     * @param orientation
+     *            The orientation, can be {@link AVKey#VERTICAL}, otherwise
+     *            assumed to be {@link AVKey#HORIZONTAL}
+     * @param value
+     *            The starting value of the slider
+     * @param min
+     *            The minimum value of the slider
+     * @param max
+     *            The maximum value of the slider
+     * @param handler
+     *            The {@link SliderWidgetHandler} to receive events when this
+     *            changes
+     * @param wwd
+     *            The {@link WorldWind} which this slider is attached to
+     */
     public SliderWidget(String id, String orientation, double value, double min, double max,
             SliderWidgetHandler handler, WorldWindow wwd) {
         super("", new java.awt.Point());
 
+        /*
+         * Setup variables
+         */
         this.id = id;
 
         if (orientation.equals(AVKey.VERTICAL)) {
@@ -109,9 +174,6 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
 
         this.backgroundColor = new Color(60, 60, 60, 128);
         this.elementColor = new Color(171, 171, 171, 196);
-        this.interiorInsets = new Insets(2, 2, 2, 2);
-
-        setPickEnabled(true);
 
         Color transparentBlack = new Color(0, 0, 0, 0);
 
@@ -138,18 +200,38 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                 CIRCLE_SIZE, 0, null);
         centreElementBuffer = FrameFactory.createShapeBuffer(AVKey.SHAPE_ELLIPSE, CENTRE_SIZE,
                 CENTRE_SIZE, 0, null);
-
+        /*
+         * Register select handler to allow dragging
+         */
+        setPickEnabled(true);
         wwd.addSelectListener(this);
     }
 
+    /**
+     * Sets whether the top/right of this slider represents the highest value
+     * 
+     * @param reversed
+     *            <code>true</code> if this slider is reversed compared to the
+     *            normal slider direction
+     */
     public void setReversed(boolean reversed) {
         this.reversed = reversed;
     }
 
+    /**
+     * @return The currently selected value of the slider
+     */
     public double getValue() {
         return value;
     }
 
+    /**
+     * Sets the value of the slider. The element will be moved on the next
+     * redraw
+     * 
+     * @param value
+     *            The desired value
+     */
     public void setValue(double value) {
         if (value < min) {
             value = min;
@@ -159,10 +241,21 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         this.value = value;
     }
 
+    /**
+     * @return The currently selected value range. This is the selected value +-
+     *         a target range
+     */
     public Extent<Double> getValueRange() {
         return Extents.newExtent(value - valueRange, value + valueRange);
     }
 
+    /**
+     * Sets the target range. The entire value range will be the selected value
+     * +- this value
+     * 
+     * @param valueRange
+     *            The range to set
+     */
     public void setValueRange(double valueRange) {
         if (valueRange < 0.0) {
             valueRange = 0;
@@ -170,10 +263,15 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             valueRange = (max - min);
         }
         this.valueRange = valueRange;
-        //        recalculateElementBuffer = true;
         setValue(value);
     }
 
+    /**
+     * Sets the minimum value of the slider
+     * 
+     * @param min
+     *            The minimum value
+     */
     public void setMin(double min) {
         this.min = min;
         if (value < min) {
@@ -181,6 +279,12 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         }
     }
 
+    /**
+     * Sets the maximum value of the slider
+     * 
+     * @param max
+     *            The maximum value of the slider
+     */
     public void setMax(double max) {
         this.max = max;
         if (value > max) {
@@ -188,7 +292,13 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         }
     }
 
-    public void setOutlineColor(java.awt.Color color) {
+    /**
+     * Sets the colour of the main slider
+     * 
+     * @param color
+     *            The {@link Color} to use
+     */
+    public void setBackgroundColor(Color color) {
         if (color == null) {
             String message = Logging.getMessage("nullValue.ColorIsNull");
             Logging.logger().severe(message);
@@ -198,7 +308,13 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         this.backgroundColor = color;
     }
 
-    public void setInteriorColor(java.awt.Color color) {
+    /**
+     * Sets the colour of the moveable element
+     * 
+     * @param color
+     *            The {@link Color} to use
+     */
+    public void setElementColor(Color color) {
         if (color == null) {
             String message = Logging.getMessage("nullValue.ColorIsNull");
             Logging.logger().severe(message);
@@ -208,39 +324,51 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         this.elementColor = color;
     }
 
-    public void setInteriorInsets(java.awt.Insets insets) {
-        if (insets == null) {
-            String message = Logging.getMessage("nullValue.InsetsIsNull");
-            Logging.logger().severe(message);
-            throw new IllegalArgumentException(message);
-        }
-
-        // Class java.awt.Insets is known to override the method Object.clone().
-        this.interiorInsets = (java.awt.Insets) insets.clone();
-    }
-
-    //**************************************************************//
-    //********************  Rendering  *****************************//
-    //**************************************************************//
+    // **************************************************************//
+    // ******************** Rendering *****************************//
+    // **************************************************************//
 
     @Override
     protected void doDraw(DrawContext dc, int width, int height, double opacity,
             Position pickPosition) {
         super.doDraw(dc, width, height, opacity, pickPosition);
-        this.drawSlider(dc, width, height, opacity, pickPosition);
+        this.drawSlider(dc, width, height, opacity);
     }
 
-    protected void drawSlider(DrawContext dc, int width, int height, double opacity,
-            Position pickPosition) {
+    /**
+     * Draws the slider
+     * 
+     * @param dc
+     *            The {@link DrawContext} to use
+     * @param width
+     *            The width of the slider space
+     * @param height
+     *            The height of the slider space
+     * @param opacity
+     *            The overall opacity
+     */
+    protected void drawSlider(DrawContext dc, int width, int height, double opacity) {
         if (dc.isPickingMode())
             return;
 
-        this.drawSliderBackground(dc, width, height, opacity, pickPosition);
-        this.drawSliderElement(dc, width, height, opacity, pickPosition);
+        this.drawSliderBackground(dc, width, height, opacity);
+        this.drawSliderElement(dc, width, height, opacity);
     }
 
-    protected void drawSliderBackground(DrawContext dc, int width, int height, double opacity,
-            Position pickPosition) {
+    /**
+     * Draws the main background of the slider (the bit that the element slides
+     * along)
+     * 
+     * @param dc
+     *            The {@link DrawContext} to use
+     * @param width
+     *            The width of the slider space
+     * @param height
+     *            The height of the slider space
+     * @param opacity
+     *            The overall opacity
+     */
+    protected void drawSliderBackground(DrawContext dc, int width, int height, double opacity) {
         Rectangle bounds = computeInsetBounds(width, height);
 
         GL gl = dc.getGL();
@@ -253,7 +381,8 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     }
 
     protected void drawCallout(DrawContext dc, int mode, Rectangle bounds, boolean useTexCoords) {
-        GL2 gl = dc.getGL().getGL2(); // GL initialization checks for GL2 compatibility.
+        GL2 gl = dc.getGL().getGL2(); // GL initialization checks for GL2
+                                      // compatibility.
 
         OGLStackHandler stackHandler = new OGLStackHandler();
         stackHandler.pushModelview(gl);
@@ -264,16 +393,33 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         stackHandler.pop(gl);
     }
 
-    protected void drawSliderElement(DrawContext dc, int width, int height, double opacity,
-            Position pickPosition) {
-        Rectangle location = computeSliderLocation(width, height);
+    /**
+     * Draws the moveable element of the slider
+     * 
+     * @param dc
+     *            The {@link DrawContext} to use
+     * @param width
+     *            The width of the slider space
+     * @param height
+     *            The height of the slider space
+     * @param opacity
+     *            The overall opacity
+     */
+    protected void drawSliderElement(DrawContext dc, int width, int height, double opacity) {
+        /*
+         * Calculate the location of the element
+         */
+        Rectangle location = computeElementLocation(width, height);
 
+        /*
+         * Recalculate the graphics buffer for the element
+         */
+        recalculateElementBuffer(width, height);
+        /*
+         * Now do the actual drawing
+         */
         applyColor(dc, elementColor, opacity, true);
         dc.getGL().getGL2().glTranslated(location.x, location.y, 0);
-        //        if (recalculateElementBuffer) {
-        recalculateElementBuffer(width, height);
-        //            recalculateElementBuffer = false;
-        //        }
         FrameFactory.drawBuffer(dc, GL.GL_TRIANGLE_FAN, elementBuffer);
         dc.getGL()
                 .getGL2()
@@ -282,7 +428,18 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         FrameFactory.drawBuffer(dc, GL.GL_TRIANGLE_FAN, centreElementBuffer);
     }
 
+    /**
+     * Recalculates the {@link java.nio.DoubleBuffer} storing the element data
+     * 
+     * @param width
+     *            The width of the slider space (i.e. not the element)
+     * @param height
+     *            The height of the slider space (i.e. not the element)
+     */
     private void recalculateElementBuffer(int width, int height) {
+        /*
+         * Find the end values to draw, truncating if required
+         */
         double valueMin = value - valueRange;
         double valueMax = value + valueRange;
         if (valueMin < this.min) {
@@ -291,6 +448,9 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         if (valueMax > this.max) {
             valueMax = this.max;
         }
+        /*
+         * Calculate the position and size, then regenerate the element buffer
+         */
         if (orientation.equals(AVKey.HORIZONTAL)) {
             int min = computeSliderRelativePos(width, valueMin) - CIRCLE_SIZE / 2;
             int max = computeSliderRelativePos(width, valueMax) - CIRCLE_SIZE / 2;
@@ -316,13 +476,18 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     }
 
     /**
-     * This method uses
+     * This method calculates the location of the slider element
      * 
      * @param width
+     *            The width of the slider space
      * @param height
-     * @return
+     *            The height of the slider space
+     * @return A {@link java.awt.Rectangle} which will be zero-width and
+     *         represent the space taken by the centre of the sliding element
+     *         (i.e. for a slider with zero range, all 4 corners will be the
+     *         same point)
      */
-    protected Rectangle computeSliderLocation(int width, int height) {
+    protected Rectangle computeElementLocation(int width, int height) {
         double valueMin = value - valueRange;
         double valueMax = value + valueRange;
         if (valueMin < this.min) {
@@ -358,6 +523,15 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         }
     }
 
+    /**
+     * Calculates the relative position of a value
+     * 
+     * @param barSize
+     *            The length/width of the slider
+     * @param value
+     *            The value to calculate
+     * @return The offset, in pixels, of the given value
+     */
     protected int computeSliderRelativePos(int barSize, double value) {
         double factor = (value - min) / (max - min);
         if (reversed) {
@@ -373,9 +547,14 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             Object topObject = event.getTopObject();
             if (topObject == this) {
                 if (event.isLeftPress()) {
+                    /* Set the last drag point */
                     lastDragPoint = event.getPickPoint();
                 }
                 if (event.isDrag()) {
+                    /*
+                     * Calculate how much the mouse has moved and set the value
+                     * accordingly
+                     */
                     Point point = event.getMouseEvent().getPoint();
                     double percMove;
                     if (orientation.equals(AVKey.HORIZONTAL)) {
@@ -408,17 +587,30 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                         setValueRange(valueRange);
                     }
                     lastDragPoint = point;
+                    /*
+                     * Start a new timer ready to trigger an event in 0.5s
+                     * unless more dragging occurs
+                     */
                     if (handler != null) {
                         resetSliderTimer();
                         handler.sliderChanged(id, getValue(), getValueRange());
                         sliderTimer.start();
                     }
+                    /*
+                     * Consume the mouse event so that it doesn't get picked up
+                     * elsewhere
+                     */
                     event.getMouseEvent().consume();
                 }
             }
         }
     }
 
+    /**
+     * Resets the timer used to trigger a
+     * {@link uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler#sliderSettled(String)}
+     * call
+     */
     private void resetSliderTimer() {
         if (sliderTimer != null) {
             sliderTimer.interrupt();
@@ -427,7 +619,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             @Override
             public void run() {
                 /*
-                 * Sleep for 1 second and then call the sliderSettled method
+                 * Sleep for 0.5 second and then call the sliderSettled method
                  */
                 try {
                     Thread.sleep(500L);

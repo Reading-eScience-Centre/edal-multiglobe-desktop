@@ -347,7 +347,7 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         lastLogScaling = logScaling;
         lastMaxScale = maxScale;
         lastMinScale = minScale;
-        //        lastNoDataColour = noDataColour;
+        // lastNoDataColour = noDataColour;
         lastNumColourBands = numColourBands;
         lastPaletteName = paletteName;
     }
@@ -460,7 +460,7 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
             numColourBands = ColourPalette.MAX_NUM_COLOURS;
         }
         this.numColourBands = numColourBands;
-        //        nColoursLabel.setText("Colours:\n" + numColourBands);
+        // nColoursLabel.setText("Colours:\n" + numColourBands);
         populatePaletteImages();
     }
 
@@ -696,20 +696,68 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
 
     /**
      * The methods which can be called if a colour scale is changed in some way
+     * 
+     * TODO once interface is added to allow log scaling, this will need an
+     * additional method
      */
     public interface PaletteSelectionHandler {
+        /**
+         * Sets the new colour scale limits
+         * 
+         * @param newScaleRange
+         *            An {@link Extent} representing the new colour scale range
+         *            to use.
+         */
         public void scaleLimitsChanged(Extent<Float> newScaleRange);
 
+        /**
+         * @param newPalette
+         *            The name of the new palette to use
+         */
         public void paletteChanged(String newPalette);
 
+        /**
+         * @param aboveMax
+         *            The {@link Color} to use for values which are higher than
+         *            the maximum
+         */
         public void aboveMaxColourChanged(Color aboveMax);
 
+        /**
+         * @param belowMin
+         *            The {@link Color} to use for values which are lower than
+         *            the minimum
+         */
         public void belowMinColourChanged(Color belowMin);
 
+        /**
+         * @param numColourBands
+         *            The number of colour bands to use
+         */
         public void setNumColourBands(int numColourBands);
 
+        /**
+         * @param opacity
+         *            The overall opacity of the layer, from 0 to 1
+         */
         public void setOpacity(double opacity);
 
+        /**
+         * Changes multiple parameters at once
+         * 
+         * @param scaleRange
+         *            The new colour scale limits
+         * @param palette
+         *            The name of the new palette
+         * @param belowMin
+         *            The {@link Color} to use for values below the minimum
+         * @param aboveMax
+         *            The {@link Color} to use for values above the maximum
+         * @param logScaling
+         *            Whether to use logarithmic scaline
+         * @param numColourBands
+         *            The number of colour bands to use
+         */
         public void bulkChange(Extent<Float> scaleRange, String palette, Color belowMin,
                 Color aboveMax, boolean logScaling, int numColourBands);
     }

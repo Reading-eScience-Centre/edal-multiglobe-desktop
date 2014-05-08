@@ -3,8 +3,8 @@
 <!--Any of these can be overridden by specifying an application configuration document-->
 <WorldWindConfiguration version="1">
     <!-- Location of the EDAL catalogue config.xml file -->
-    <Property name="uk.ac.rdg.resc.edal.multiglobe.CatalogueLocation"
-              value="/home/guy/.ncWMS-edal/config.xml"/>
+    <!-- Property name="uk.ac.rdg.resc.edal.multiglobe.CatalogueLocation"
+              value="/home/guy/.ncWMS-edal/config.xml"/ -->
     <!-- This property is ignored and programmatically set to uk.ac.rdg.resc.LinkedView -->
     <!-- This is required for the multiglobe software to work. -->
     <!-- Changing or removing it has no effect -->

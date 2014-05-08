@@ -66,7 +66,7 @@ import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.position.VerticalCrs;
 import uk.ac.rdg.resc.edal.util.Extents;
 import uk.ac.rdg.resc.edal.util.TimeUtils;
-import uk.ac.rdg.resc.edal.wms.exceptions.WmsLayerNotFoundException;
+import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.logging.RescLogging;
 import uk.ac.rdg.resc.widgets.FeatureInfoBalloon;
 import uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler;
@@ -219,11 +219,11 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      * 
      * @param layerName
      *            The ID of the layer to display in the model
-     * @throws WmsLayerNotFoundException
+     * @throws EdalLayerNotFoundException
      *             If the ID supplied dose not represent a layer in the
      *             {@link VideoWallCatalogue} attached to this {@link RescModel}
      */
-    public void setDataLayer(String layerName) throws WmsLayerNotFoundException {
+    public void setDataLayer(String layerName) throws EdalLayerNotFoundException {
         System.out.println("setting data layer: " + layerName);
 
         /*
