@@ -40,6 +40,10 @@
 			<directory>${basedir}/sample_data</directory>
 			<outputDirectory>/</outputDirectory>
 		</fileSet>
+		<fileSet>
+			<directory>${basedir}/docs</directory>
+			<outputDirectory>/</outputDirectory>
+		</fileSet>
 	</fileSets>
 	<dependencySets>
 		<dependencySet>

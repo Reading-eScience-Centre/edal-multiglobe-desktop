@@ -58,7 +58,7 @@
 							<mainClass>uk.ac.rdg.resc.VideoWall</mainClass>
 						</manifest>
 					</archive>
-					<finalName>multiglobe</finalName>
+					<finalName>resc-multiglobe</finalName>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -120,7 +120,7 @@
 					<descriptors>
 						<descriptor>src/assembly/assembly.xml</descriptor>
 					</descriptors>
-					<finalName>edal-multiglobe-desktop-${project.version}</finalName>
+					<finalName>resc-multiglobe</finalName>
 				</configuration>
 				<executions>
 					<execution>
