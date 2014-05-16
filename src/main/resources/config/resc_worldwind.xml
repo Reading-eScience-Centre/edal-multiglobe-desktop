@@ -18,8 +18,6 @@
     <!--Most configuration information is defined in attribute-value pairs-->
     <Property name="gov.nasa.worldwind.avkey.GlobeClassName"
               value="gov.nasa.worldwind.globes.Earth"/>
-    <Property name="gov.nasa.worldwind.avkey.EarthElevationModelConfigFile"
-              value="config/EarthElevations2.xml"/>
     <Property name="gov.nasa.worldwind.avkey.InitialLatitude" value="38"/>
     <Property name="gov.nasa.worldwind.avkey.InitialAltitude" value="19.07e6"/>
     <Property name="gov.nasa.worldwind.avkey.ViewInputHandlerClassName"

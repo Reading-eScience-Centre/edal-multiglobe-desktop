@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<config>
+    <datasets>
+        <dataset id="sst_mean" title="NCEP Global Ocean Data Assimilation System" location="data/sea_water_potential_temperature-monthly_means.nc" queryable="true" dataReaderClass="" copyrightStatement="" moreInfo="" disabled="false" updateInterval="-1">
+            <variables>
+                <variable id="pottmp" title="Sea water temperature" description="Potential temperature" colorScaleRange="268.85815 305.63113" palette="heat" scaling="linear" numColorBands="250" disabled="false"/>
+            </variables>
+        </dataset>
+        <dataset id="air_mean" title="NOAA GHCN CAMS Temperature (Land)" location="data/land_air_temperature-monthly_means.nc" queryable="true" dataReaderClass="" copyrightStatement="" moreInfo="" disabled="false" updateInterval="-1">
+            <variables>
+                <variable id="air" title="Land air temperature" description="Monthly mean of surface temperature" colorScaleRange="222.6505 314.5995" palette="heat" scaling="linear" numColorBands="250" disabled="false"/>
+            </variables>
+        </dataset>
+    </datasets>
+    <contact>
+        <name></name>
+        <organization></organization>
+        <telephone></telephone>
+        <email></email>
+    </contact>
+    <server>
+        <title>VideoWall datasets</title>
+        <allowFeatureInfo>true</allowFeatureInfo>
+        <maxImageWidth>1024</maxImageWidth>
+        <maxImageHeight>1024</maxImageHeight>
+        <abstract></abstract>
+        <keywords></keywords>
+        <url></url>
+        <adminpassword>ncWMS</adminpassword>
+        <allowglobalcapabilities>true</allowglobalcapabilities>
+    </server>
+    <cache enabled="false">
+        <elementLifetimeMinutes>1440</elementLifetimeMinutes>
+        <maxNumItemsInMemory>200</maxNumItemsInMemory>
+        <enableDiskStore>false</enableDiskStore>
+        <maxNumItemsOnDisk>2000</maxNumItemsOnDisk>
+    </cache>
+</config>

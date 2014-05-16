@@ -35,7 +35,10 @@ import gov.nasa.worldwind.util.Logging;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Frame;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -156,6 +159,8 @@ public class VideoWall extends JFrame {
         add(globePanels, BorderLayout.CENTER);
         add(addRemoveColumnPanel, BorderLayout.EAST);
         add(addRemoveRowPanel, BorderLayout.SOUTH);
+        
+        setPreferredSize(new Dimension(1280, 720));
     }
 
     public static void main(String[] args) {
@@ -183,14 +188,15 @@ public class VideoWall extends JFrame {
          * Set the config location
          */
         System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
+        
+        final boolean fullscreen = Configuration.getBooleanValue("uk.ac.rdg.resc.edal.multiglobe.Fullscreen", true);
+        final int screenNumber = Configuration.getIntegerValue("uk.ac.rdg.resc.edal.multiglobe.ScreenNumber", 0);
+        
         java.awt.EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
                 JFrame frame = null;
                 try {
-                    /*
-                     * Create a fullscreen application
-                     */
                     frame = new VideoWall();
                 } catch (Exception e) {
                     /*
@@ -202,12 +208,33 @@ public class VideoWall extends JFrame {
                     e.printStackTrace();
                     System.exit(0);
                 }
-                frame.setUndecorated(true);
-                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                
+                
+                if(fullscreen) {
+	                /*
+	                 * Create a fullscreen application
+	                 */
+	                frame.setUndecorated(true);
+	                int size = frame.getExtendedState();
+	                size |= Frame.MAXIMIZED_BOTH;
+	                frame.setExtendedState(size);
+	                
+	                /*
+	                 * Move to a particular screen if defined in the config
+	                 */
+	                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+	                GraphicsDevice[] gd = ge.getScreenDevices();
+	                if( screenNumber > -1 && screenNumber < gd.length ) {
+	                	frame.setLocation(gd[screenNumber].getDefaultConfiguration().getBounds().x, gd[screenNumber].getDefaultConfiguration().getBounds().y);
+	                } else if( gd.length > 0 ) {
+	                	frame.setLocation(gd[0].getDefaultConfiguration().getBounds().x, gd[0].getDefaultConfiguration().getBounds().y);
+	                } else {
+	                	throw new RuntimeException( "No Screens Found" );
+	                }
+                }
                 frame.pack();
-                int size = frame.getExtendedState();
-                size |= Frame.MAXIMIZED_BOTH;
-                frame.setExtendedState(size);
+                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                frame.setTitle("MultiGlobe");
                 frame.setVisible(true);
             }
         });
