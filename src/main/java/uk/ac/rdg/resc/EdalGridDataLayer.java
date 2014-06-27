@@ -393,7 +393,10 @@ public class EdalGridDataLayer implements EdalDataLayer {
 			 * Nothing we can do about this
 			 */
 		}
-		threadPool = Executors.newFixedThreadPool(2);
+		/*
+		 * TODO make this a configurable quantity
+		 */
+		threadPool = Executors.newFixedThreadPool(1);
 
 		if (tAxis != null) {
 			timeCacheTask = new TimeCacher(time, elevation);
