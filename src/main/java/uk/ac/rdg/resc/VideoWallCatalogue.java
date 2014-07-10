@@ -105,15 +105,18 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
     @Override
     public void datasetLoaded(Dataset dataset, Collection<NcwmsVariable> variables) {
         super.datasetLoaded(dataset, variables);
-        System.out.println(dataset.getId()+" loaded");
-
+        /*
+         * Update the menu. We do this prior to trying to cache the dataset.
+         */
+        addDatasetToMenu(dataset);
+        System.out.println("Loaded metadata for dataset: " + dataset.getId());
         /*
          * For any variables which map to gridded features, preload into memory
          */
         for (NcwmsVariable variable : variables) {
-            Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
-                    .getFeatureType(variable.getId());
-            if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
+            Class<? extends DiscreteFeature<?, ?>> featureType = dataset.getFeatureType(variable
+                    .getId());
+            if (GridFeature.class.isAssignableFrom(featureType)) {
                 /*
                  * This preloads features in memory. Speeds up operation, but
                  * slows loading. This is usually commented out during
@@ -123,7 +126,11 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                     String layerName = getLayerName(dataset.getId(), variable.getId());
                     GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
                     gridFeatures.put(layerName, gridFeature);
+                    System.out.println("grid feature cached in memory with ID:" + layerName);
                 } catch (Exception e) {
+                    System.out.println("Dataset " + dataset.getId()
+                            + " couldn't be loaded into memory");
+                    e.printStackTrace();
                     /*
                      * Log, and ignore that it can't read data, but maybe it
                      * will work later (e.g. remote data).
@@ -140,18 +147,16 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                  */
             }
         }
+        System.out.println(dataset.getId() + " loaded");
         String message = RescLogging.getMessage("resc.DatasetLoaded", dataset.getId());
         Logging.logger().fine(message);
-        /*
-         * Update the menu
-         */
-        addDatasetToMenu(dataset);
     }
 
     @Override
     public FeaturesAndMemberName getFeaturesForLayer(String id, PlottingDomainParams params)
             throws EdalException {
         String varId = getVariableFromId(id);
+
         if (gridFeatures.containsKey(id)) {
             /*
              * If we have an in-memory grid feature, just extract a subset of it

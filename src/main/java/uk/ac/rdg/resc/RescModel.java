@@ -314,6 +314,30 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     /**
+     * Changes the elevation slider by a fraction of the whole range
+     * 
+     * @param frac
+     *            The fraction to change the slider by
+     */
+    public void changeElevationSlider(double frac) {
+        if(elevationSlider != null) {
+            elevationSlider.changeByFrac(frac);
+        }
+    }
+    
+    /**
+     * Changes the time slider by a fraction of the whole range
+     * 
+     * @param frac
+     *            The fraction to change the slider by
+     */
+    public void changeTimeSlider(double frac) {
+        if(timeSlider != null) {
+            timeSlider.changeByFrac(frac);
+        }
+    }
+
+    /**
      * Adds/adjusts the time/elevation sliders
      * 
      * @param layerMetadata
@@ -473,12 +497,14 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      * @param position
      *            The {@link Position} at which to measure data and display the
      *            {@link FeatureInfoBalloon}
+     *            @param replaceExisting
+     *            Whether or not to pop up a new {@link FeatureInfoBalloon} if we already have one showing
      */
-    public void showFeatureInfo(final Position position) {
+    public void showFeatureInfo(final Position position, boolean replaceExisting) {
         /*
-         * Only display feature info if we have an active layer
+         * Only display feature info if we have an active layer, and either don't have an existing balloon or want to replace the existing one
          */
-        if (edalLayerName != null && !edalLayerName.equals("")) {
+        if (edalLayerName != null && !edalLayerName.equals("") && ((balloon == null || !balloon.isActive()) || replaceExisting)) {
             /*
              * Delegate the actual work to a private method which can then be
              * called for all linked models.
@@ -511,7 +537,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     /**
-     * Does the work of {@link RescModel#showFeatureInfo(Position)}
+     * Does the work of {@link RescModel#showFeatureInfo(Position, boolean)}
      * 
      * @param position
      *            The {@link Position} at which to measure data and display the

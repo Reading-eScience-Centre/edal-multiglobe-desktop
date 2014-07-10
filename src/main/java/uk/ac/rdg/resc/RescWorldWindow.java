@@ -31,12 +31,8 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.Model;
 import gov.nasa.worldwind.View;
 import gov.nasa.worldwind.WorldWindow;
-import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
-import gov.nasa.worldwind.geom.Position;
-
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-
+import gov.nasa.worldwind.awt.WorldWindowGLJPanel;
+import javafx.embed.swing.SwingNode;
 import uk.ac.rdg.resc.input.RescInputHandler;
 
 /**
@@ -48,8 +44,17 @@ import uk.ac.rdg.resc.input.RescInputHandler;
  * @author Guy Griffiths
  */
 @SuppressWarnings("serial")
-public class RescWorldWindow extends WorldWindowGLCanvas {
-    public RescWorldWindow() {
+public class RescWorldWindow extends WorldWindowGLJPanel {
+    /**
+     * Instantiates a new {@link RescWorldWindow}.
+     * 
+     * @param container
+     *            The {@link SwingNode} which will contain this
+     *            {@link RescWorldWindow}. The {@link RescInputHandler}
+     *            associated with this {@link RescWorldWindow} will register
+     *            callbacks to this {@link SwingNode} to deal with touch events.
+     */
+    public RescWorldWindow(SwingNode container) {
         super();
 
         /*
@@ -58,42 +63,42 @@ public class RescWorldWindow extends WorldWindowGLCanvas {
          * mouseClicked event gets created in the previous position when we
          * click close - so a feature balloon can never be removed...)
          */
-        RescInputHandler rescInputHandler = new RescInputHandler();
-        rescInputHandler.setEventSource(this);
+
+        RescInputHandler rescInputHandler = new RescInputHandler(container, this);
         setInputHandler(rescInputHandler);
 
         /*
          * We need to add a listener for clicks on the globe to display
          * information and graphs when layers are clicked
          */
-        addMouseListener(new MouseListener() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (!e.isConsumed()) {
-                    Position currentPosition = getCurrentPosition();
-                    if (currentPosition != null) {
-                        getModel().showFeatureInfo(currentPosition);
-                        e.consume();
-                    }
-                }
-            }
-
-            @Override
-            public void mouseReleased(MouseEvent e) {
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-            }
-
-            @Override
-            public void mouseEntered(MouseEvent e) {
-            }
-        });
+//        addMouseListener(new MouseListener() {
+//            @Override
+//            public void mouseClicked(MouseEvent e) {
+//                if (!e.isConsumed()) {
+//                    Position currentPosition = getCurrentPosition();
+//                    if (currentPosition != null) {
+//                        getModel().showFeatureInfo(currentPosition);
+//                        e.consume();
+//                    }
+//                }
+//            }
+//
+//            @Override
+//            public void mouseReleased(MouseEvent e) {
+//            }
+//
+//            @Override
+//            public void mousePressed(MouseEvent e) {
+//            }
+//
+//            @Override
+//            public void mouseExited(MouseEvent e) {
+//            }
+//
+//            @Override
+//            public void mouseEntered(MouseEvent e) {
+//            }
+//        });
     }
 
     @Override

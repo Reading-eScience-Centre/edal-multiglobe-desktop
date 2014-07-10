@@ -204,6 +204,10 @@ public class LinkedView extends BasicOrbitView {
         }
     }
 
+    public void changeHeading(Angle heading) {
+        setHeading(getHeading().add(heading));
+    }
+
     /**
      * Called by other {@link LinkedView}s when their heading changes
      * 
@@ -228,6 +232,10 @@ public class LinkedView extends BasicOrbitView {
                 view.setLinkedPitch(pitch);
             }
         }
+    }
+
+    public void changePitch(Angle pitch) {
+        setPitch(pitch.add(getPitch()));
     }
 
     /**
@@ -257,6 +265,10 @@ public class LinkedView extends BasicOrbitView {
                 view.setLinkedZoom(zoom);
             }
         }
+    }
+
+    public void changeZoom(double zoomFactor) {
+        setZoom(getZoom() * zoomFactor);
     }
 
     /**

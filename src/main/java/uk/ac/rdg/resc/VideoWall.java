@@ -30,55 +30,59 @@ package uk.ac.rdg.resc;
 
 import gov.nasa.worldwind.Configuration;
 import gov.nasa.worldwind.avlist.AVKey;
-import gov.nasa.worldwind.util.Logging;
 
-import java.awt.BorderLayout;
-import java.awt.Button;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Frame;
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
-import java.awt.Toolkit;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.IOException;
 
-import javax.swing.BoxLayout;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
+import javafx.application.Application;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.stage.Screen;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+import javafx.stage.WindowEvent;
+
 import javax.xml.bind.JAXBException;
 
 import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
 import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
-import uk.ac.rdg.resc.logging.RescLogging;
 
 /**
  * Main class for the multi-globe video wall software.
  * 
  * @author Guy Griffiths
  */
-@SuppressWarnings("serial")
-public class VideoWall extends JFrame {
-    private VideoWallCatalogue datasetLoader;
+public class VideoWall extends Application {
+    private static final int BUTTON_WIDTH=30;
+    
+	private VideoWallCatalogue datasetLoader;
     private MultiGlobeFrame globePanels;
-    private JPanel addRemoveRowPanel;
-    private JPanel addRemoveColumnPanel;
+    private VBox addRemoveRowPane;
+    private HBox addRemoveColumnPane;
+    private BorderPane mainPane;
 
+    public VideoWall() throws IOException, EdalException, JAXBException {
+    }
+    
     /**
      * Set up necessary components and loads some buttons into the main panel
      * for adding/removing globe panels
      */
-    public VideoWall() throws IOException, EdalException, JAXBException {
-        Configuration.setValue(AVKey.VIEW_CLASS_NAME, LinkedView.class.getName());
-        
-        /*
-         * Set the default data reader. This means that we don't need to specify
-         * a dataset factory for cases where we are reading gridded NetCDF data
-         * (the majority)
-         */
-        DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
+    public void start(Stage primaryStage) throws Exception {
+    	Configuration.setValue(AVKey.VIEW_CLASS_NAME, LinkedView.class.getName());
+    	
+    	/*
+    	 * Set the default data reader. This means that we don't need to specify
+    	 * a dataset factory for cases where we are reading gridded NetCDF data
+    	 * (the majority)
+    	 */
+    	DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
 
         /*
          * Initialise the dataset catalogue
@@ -92,151 +96,160 @@ public class VideoWall extends JFrame {
         /*
          * Create and wire up the panel for adding/removing rows
          */
-        addRemoveRowPanel = new JPanel();
+        addRemoveRowPane = new VBox();
 
         /* The add row button */
         Button addRowButton = new Button("+");
-        addRowButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                globePanels.addRow();
-            }
-        });
-        addRowButton.setBackground(Color.black);
-        addRowButton.setForeground(Color.lightGray);
-        addRowButton.setSize(100, 50);
-
+        addRowButton.setOnAction(new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent e) {
+				globePanels.addRow();
+			}
+		});
+        /*
+         * TODO implement styling using CSS
+         */
+        addRowButton.setStyle("-fx-base: #000000;");
+        addRowButton.setTextFill(Color.LIGHTGRAY);
+        addRowButton.setMaxHeight(BUTTON_WIDTH);
+        addRowButton.setMinHeight(BUTTON_WIDTH);
+        addRowButton.setPrefHeight(BUTTON_WIDTH);
+        addRowButton.setMaxWidth(Double.MAX_VALUE);
+        
         /* The remove row button */
         Button removeRowButton = new Button("-");
-        removeRowButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                globePanels.removeRow();
-            }
+        removeRowButton.setOnAction(new EventHandler<ActionEvent>() {
+        	@Override
+        	public void handle(ActionEvent e) {
+        		globePanels.removeRow();
+        	}
         });
-        removeRowButton.setBackground(Color.black);
-        removeRowButton.setForeground(Color.lightGray);
-        addRemoveRowPanel.setLayout(new BoxLayout(addRemoveRowPanel, BoxLayout.PAGE_AXIS));
-        addRemoveRowPanel.add(removeRowButton);
-        addRemoveRowPanel.add(addRowButton);
+        /*
+         * TODO implement styling using CSS
+         */
+        removeRowButton.setStyle("-fx-base: #000000;");
+        removeRowButton.setTextFill(Color.LIGHTGRAY);
+        removeRowButton.setMaxHeight(BUTTON_WIDTH);
+        removeRowButton.setMinHeight(BUTTON_WIDTH);
+        removeRowButton.setPrefHeight(BUTTON_WIDTH);
+        removeRowButton.setMaxWidth(Double.MAX_VALUE);
+
+        addRemoveRowPane.getChildren().addAll(removeRowButton, addRowButton);
 
         /*
          * Create and wire up the panel for adding/removing columns
          */
-        addRemoveColumnPanel = new JPanel();
-
+        addRemoveColumnPane = new HBox();
+        
         /* The add column button */
         Button addColumnButton = new Button("+");
-        addColumnButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                globePanels.addColumn();
-            }
-        });
-        addColumnButton.setBackground(Color.black);
-        addColumnButton.setForeground(Color.lightGray);
-
+        addColumnButton.setOnAction(new EventHandler<ActionEvent>() {
+			@Override
+			public void handle(ActionEvent e) {
+				globePanels.addColumn();
+			}
+		});
+        /*
+         * TODO implement styling using CSS
+         */
+        addColumnButton.setStyle("-fx-base: #000000;");
+        addColumnButton.setTextFill(Color.LIGHTGRAY);
+        addColumnButton.setMaxWidth(BUTTON_WIDTH);
+        addColumnButton.setMinWidth(BUTTON_WIDTH);
+        addColumnButton.setPrefWidth(BUTTON_WIDTH);
+        addColumnButton.setMaxHeight(Double.MAX_VALUE);
+        
         /* The remove column button */
-        Button removeColumnButton = new Button(" - ");
-        removeColumnButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                globePanels.removeColumn();
-            }
+        Button removeColumnButton = new Button("-");
+        removeColumnButton.setOnAction(new EventHandler<ActionEvent>() {
+        	@Override
+        	public void handle(ActionEvent e) {
+        		globePanels.removeColumn();
+        	}
         });
-        removeColumnButton.setBackground(Color.black);
-        removeColumnButton.setForeground(Color.lightGray);
-        addRemoveColumnPanel.setLayout(new BoxLayout(addRemoveColumnPanel, BoxLayout.LINE_AXIS));
+        /*
+         * TODO implement styling using CSS
+         */
+        removeColumnButton.setStyle("-fx-base: #000000;");
+        removeColumnButton.setTextFill(Color.LIGHTGRAY);
+        removeColumnButton.setMaxWidth(BUTTON_WIDTH);
+        removeColumnButton.setMinWidth(BUTTON_WIDTH);
+        removeColumnButton.setPrefWidth(BUTTON_WIDTH);
+        removeColumnButton.setMaxHeight(Double.MAX_VALUE);
 
-        addRemoveColumnPanel.add(removeColumnButton);
-        addRemoveColumnPanel.add(addColumnButton);
+        addRemoveColumnPane.getChildren().addAll(removeColumnButton, addColumnButton);
 
         /*
          * Now set the main window layout with the main globe panel and the
          * buttons
          */
-        setLayout(new BorderLayout());
-        add(globePanels, BorderLayout.CENTER);
-        add(addRemoveColumnPanel, BorderLayout.EAST);
-        add(addRemoveRowPanel, BorderLayout.SOUTH);
+        mainPane = new BorderPane();
+        mainPane.setRight(addRemoveColumnPane);
+        mainPane.setBottom(addRemoveRowPane);
+//        SwingNode mainNode = new SwingNode();
         
-        setPreferredSize(new Dimension(1280, 720));
+//        mainNode.setContent(globePanels);
+//        mainPane.setCenter(mainNode);
+        
+//        globePanels.setMaxHeight(Double.MAX_VALUE);
+//        globePanels.setMaxWidth(Double.MAX_VALUE);
+        
+        mainPane.setCenter(globePanels);
+        
+        primaryStage.setScene(new Scene(mainPane, 1280, 720));
+        
+        boolean fullscreen = Configuration.getBooleanValue("uk.ac.rdg.resc.edal.multiglobe.Fullscreen", true);
+        int screenNumber = Configuration.getIntegerValue("uk.ac.rdg.resc.edal.multiglobe.ScreenNumber", 0);
+    	if(fullscreen) {
+    	    int primaryMon = 0;
+    	    Screen primary = Screen.getPrimary();
+    	    for(int i = 0; i < Screen.getScreens().size(); i++){
+    	        if(Screen.getScreens().get(i).equals(primary)){
+                    primaryMon = i;
+    	            System.out.println("primary: " + i);
+    	            break;
+    	        }
+    	    }
+
+    	    if(primaryMon == screenNumber) {
+    	        primaryStage.setFullScreen(fullscreen);
+    	    } else {
+    	        for(int i=0; i<Screen.getScreens().size(); i++) {
+    	            if(i==screenNumber) {
+    	                Screen screen = Screen.getScreens().get(i);
+    	                primaryStage.setX(screen.getVisualBounds().getMinX());
+    	                primaryStage.setY(screen.getVisualBounds().getMinY());
+    	                primaryStage.setWidth(screen.getVisualBounds().getWidth());
+    	                primaryStage.setHeight(screen.getVisualBounds().getHeight());
+    	                primaryStage.initStyle(StageStyle.UNDECORATED);
+    	            }
+    	        }
+    	        
+    	    }
+    	    
+    	}
+    	
+    	primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+            @Override
+            public void handle(WindowEvent arg0) {
+                /*
+                 * Exit properly here
+                 */
+            }
+        });
+    	
+    	primaryStage.show();
     }
 
     public static void main(String[] args) {
-        try {
-            /*
-             * This code sets the X Windows property WM_CLASS to
-             * "VideoWallGlobes"
-             * 
-             * This is useful for identifying the window for e.g. automatically
-             * handling it in a tiling window manager.
-             */
-            Toolkit xToolkit = Toolkit.getDefaultToolkit();
-            java.lang.reflect.Field awtAppClassNameField;
-            awtAppClassNameField = xToolkit.getClass().getDeclaredField("awtAppClassName");
-            awtAppClassNameField.setAccessible(true);
-            awtAppClassNameField.set(xToolkit, "VideoWallGlobes");
-        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException
-                | IllegalAccessException e) {
-            /*
-             * It doesn't really matter if it fails, so ignore it
-             */
-        }
+    	/*
+    	 * Set the config location
+    	 */
+    	System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
 
-        /*
-         * Set the config location
-         */
-        System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
-        
-        final boolean fullscreen = Configuration.getBooleanValue("uk.ac.rdg.resc.edal.multiglobe.Fullscreen", true);
-        final int screenNumber = Configuration.getIntegerValue("uk.ac.rdg.resc.edal.multiglobe.ScreenNumber", 0);
-        
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                JFrame frame = null;
-                try {
-                    frame = new VideoWall();
-                } catch (Exception e) {
-                    /*
-                     * We have a problem instantiating the video wall. This is
-                     * unrecoverable, so log it, print stack trace and exit.
-                     */
-                    String message = RescLogging.getMessage("resc.StartupError");
-                    Logging.logger().severe(message);
-                    e.printStackTrace();
-                    System.exit(0);
-                }
-                
-                
-                if(fullscreen) {
-	                /*
-	                 * Create a fullscreen application
-	                 */
-	                frame.setUndecorated(true);
-	                int size = frame.getExtendedState();
-	                size |= Frame.MAXIMIZED_BOTH;
-	                frame.setExtendedState(size);
-	                
-	                /*
-	                 * Move to a particular screen if defined in the config
-	                 */
-	                GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-	                GraphicsDevice[] gd = ge.getScreenDevices();
-	                if( screenNumber > -1 && screenNumber < gd.length ) {
-	                	frame.setLocation(gd[screenNumber].getDefaultConfiguration().getBounds().x, gd[screenNumber].getDefaultConfiguration().getBounds().y);
-	                } else if( gd.length > 0 ) {
-	                	frame.setLocation(gd[0].getDefaultConfiguration().getBounds().x, gd[0].getDefaultConfiguration().getBounds().y);
-	                } else {
-	                	throw new RuntimeException( "No Screens Found" );
-	                }
-                }
-                frame.pack();
-                frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                frame.setTitle("MultiGlobe");
-                frame.setVisible(true);
-            }
-        });
+    	/*
+    	 * TODO set window class name
+    	 */
+    	launch(args);
     }
 }

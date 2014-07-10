@@ -239,6 +239,12 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
             value = max;
         }
         this.value = value;
+
+        if (handler != null) {
+//            resetSliderTimer();
+            handler.sliderChanged(id, getValue(), getValueRange());
+//            sliderTimer.start();
+        }
     }
 
     /**

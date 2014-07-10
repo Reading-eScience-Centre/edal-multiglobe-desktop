@@ -41,7 +41,7 @@ import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
 
 /**
  * Interface representing (but NOT necessarily extending) a {@link Layer} to
- * display data from the EDAl libraries.
+ * display data from the EDAL libraries.
  * 
  * Classes implementing this interface should take care of creating the
  * {@link Layer} object and adding it to the {@link WorldWindow} themselves.

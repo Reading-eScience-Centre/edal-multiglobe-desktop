@@ -244,6 +244,12 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
         sliderWidget.setMax(max);
     }
 
+    public void changeByFrac(double frac) {
+            double change = frac
+                    * (sliderWidget.max-sliderWidget.min);
+            setSliderValue(sliderWidget.value + change);
+    }
+
     /**
      * Sets the selected value of this slider
      * 

@@ -89,7 +89,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 	/** The {@link RescWorldWindow} which will display the layer */
 	private RescWorldWindow wwd;
 
-	/** The actual data {@link Layer} */
+	/** The actual data {@link gov.nasa.worldwind.layers.Layer} */
 	private EdalProfileData dataLayer;
 	/** The current elevation */
 	private Double elevation;
@@ -516,7 +516,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 								MARKER_SIZE * 1.5);
 					} else if (event.isLeftClick()) {
 						wwd.getModel().showFeatureInfo(
-								((Marker) topObject).getPosition());
+								((Marker) topObject).getPosition(), true);
 					}
 				}
 			}

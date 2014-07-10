@@ -108,6 +108,8 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
     /** Panel to hold content */
     private Annotation featureInfoContent;
 
+    private boolean isActive = true;
+
     /**
      * Creates a new {@link FeatureInfoBalloon}
      * 
@@ -279,6 +281,10 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
         }
     }
 
+    public boolean isActive() {
+        return isActive;
+    }
+
     @Override
     public void selected(SelectEvent event) {
         if (event.hasObjects()) {
@@ -293,6 +299,7 @@ public class FeatureInfoBalloon extends DialogAnnotation implements SelectListen
                      */
                     balloonLayer.removeAnnotation(FeatureInfoBalloon.this);
                     wwd.removeSelectListener(this);
+                    isActive = false;
                 } else if (selectObj == profileGraph) {
                     /* Display the profile graph full-sized */
                     showFullScreenGraph(profileFullPath);
