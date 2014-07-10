@@ -38,10 +38,17 @@ import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -59,30 +66,32 @@ import uk.ac.rdg.resc.edal.exceptions.EdalException;
  * @author Guy Griffiths
  */
 public class VideoWall extends Application {
-    private static final int BUTTON_WIDTH=30;
-    
-	private VideoWallCatalogue datasetLoader;
+    private static final int BUTTON_WIDTH = 30;
+
+    private VideoWallCatalogue datasetLoader;
     private MultiGlobeFrame globePanels;
     private VBox addRemoveRowPane;
     private HBox addRemoveColumnPane;
-    private BorderPane mainPane;
+    private GridPane mainPane;
+    
+    private Stage configWindow;
 
     public VideoWall() throws IOException, EdalException, JAXBException {
     }
-    
+
     /**
      * Set up necessary components and loads some buttons into the main panel
      * for adding/removing globe panels
      */
     public void start(Stage primaryStage) throws Exception {
-    	Configuration.setValue(AVKey.VIEW_CLASS_NAME, LinkedView.class.getName());
-    	
-    	/*
-    	 * Set the default data reader. This means that we don't need to specify
-    	 * a dataset factory for cases where we are reading gridded NetCDF data
-    	 * (the majority)
-    	 */
-    	DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
+        Configuration.setValue(AVKey.VIEW_CLASS_NAME, LinkedView.class.getName());
+
+        /*
+         * Set the default data reader. This means that we don't need to specify
+         * a dataset factory for cases where we are reading gridded NetCDF data
+         * (the majority)
+         */
+        DatasetFactory.setDefaultDatasetFactoryClass(CdmGridDatasetFactory.class);
 
         /*
          * Initialise the dataset catalogue
@@ -101,11 +110,11 @@ public class VideoWall extends Application {
         /* The add row button */
         Button addRowButton = new Button("+");
         addRowButton.setOnAction(new EventHandler<ActionEvent>() {
-			@Override
-			public void handle(ActionEvent e) {
-				globePanels.addRow();
-			}
-		});
+            @Override
+            public void handle(ActionEvent e) {
+                globePanels.addRow();
+            }
+        });
         /*
          * TODO implement styling using CSS
          */
@@ -115,14 +124,14 @@ public class VideoWall extends Application {
         addRowButton.setMinHeight(BUTTON_WIDTH);
         addRowButton.setPrefHeight(BUTTON_WIDTH);
         addRowButton.setMaxWidth(Double.MAX_VALUE);
-        
+
         /* The remove row button */
         Button removeRowButton = new Button("-");
         removeRowButton.setOnAction(new EventHandler<ActionEvent>() {
-        	@Override
-        	public void handle(ActionEvent e) {
-        		globePanels.removeRow();
-        	}
+            @Override
+            public void handle(ActionEvent e) {
+                globePanels.removeRow();
+            }
         });
         /*
          * TODO implement styling using CSS
@@ -140,15 +149,15 @@ public class VideoWall extends Application {
          * Create and wire up the panel for adding/removing columns
          */
         addRemoveColumnPane = new HBox();
-        
+
         /* The add column button */
         Button addColumnButton = new Button("+");
         addColumnButton.setOnAction(new EventHandler<ActionEvent>() {
-			@Override
-			public void handle(ActionEvent e) {
-				globePanels.addColumn();
-			}
-		});
+            @Override
+            public void handle(ActionEvent e) {
+                globePanels.addColumn();
+            }
+        });
         /*
          * TODO implement styling using CSS
          */
@@ -158,14 +167,14 @@ public class VideoWall extends Application {
         addColumnButton.setMinWidth(BUTTON_WIDTH);
         addColumnButton.setPrefWidth(BUTTON_WIDTH);
         addColumnButton.setMaxHeight(Double.MAX_VALUE);
-        
+
         /* The remove column button */
         Button removeColumnButton = new Button("-");
         removeColumnButton.setOnAction(new EventHandler<ActionEvent>() {
-        	@Override
-        	public void handle(ActionEvent e) {
-        		globePanels.removeColumn();
-        	}
+            @Override
+            public void handle(ActionEvent e) {
+                globePanels.removeColumn();
+            }
         });
         /*
          * TODO implement styling using CSS
@@ -180,56 +189,101 @@ public class VideoWall extends Application {
         addRemoveColumnPane.getChildren().addAll(removeColumnButton, addColumnButton);
 
         /*
+         * Config menu button to bring up window to load/save configs, exit
+         * program, and anything else we might want
+         */
+        
+        configWindow = new Stage();
+        Button a = new Button("A");
+        Button b = new Button("B");
+        VBox box = new VBox(a, b);
+        configWindow.setScene(new Scene(box, 100, 200));
+        configWindow.initModality(Modality.APPLICATION_MODAL);
+        configWindow.initOwner(primaryStage);
+        
+        
+        Button configButton = new Button();
+        configButton.setStyle("-fx-base: #000000;");
+        Image buttonImage = new Image("images/config.png");
+        ImageView buttonImageView = new ImageView(buttonImage);
+        configButton.setGraphic(buttonImageView);
+        configButton.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent e) {
+                configWindow.showAndWait();
+            }
+        });
+
+        /*
          * Now set the main window layout with the main globe panel and the
          * buttons
          */
-        mainPane = new BorderPane();
-        mainPane.setRight(addRemoveColumnPane);
-        mainPane.setBottom(addRemoveRowPane);
-//        SwingNode mainNode = new SwingNode();
+        mainPane = new GridPane();
+        /*
+         * Black background between elements
+         */
+        mainPane.setStyle("-fx-base: #000000;");
         
-//        mainNode.setContent(globePanels);
-//        mainPane.setCenter(mainNode);
-        
-//        globePanels.setMaxHeight(Double.MAX_VALUE);
-//        globePanels.setMaxWidth(Double.MAX_VALUE);
-        
-        mainPane.setCenter(globePanels);
-        
-        primaryStage.setScene(new Scene(mainPane, 1280, 720));
-        
-        boolean fullscreen = Configuration.getBooleanValue("uk.ac.rdg.resc.edal.multiglobe.Fullscreen", true);
-        int screenNumber = Configuration.getIntegerValue("uk.ac.rdg.resc.edal.multiglobe.ScreenNumber", 0);
-    	if(fullscreen) {
-    	    int primaryMon = 0;
-    	    Screen primary = Screen.getPrimary();
-    	    for(int i = 0; i < Screen.getScreens().size(); i++){
-    	        if(Screen.getScreens().get(i).equals(primary)){
-                    primaryMon = i;
-    	            System.out.println("primary: " + i);
-    	            break;
-    	        }
-    	    }
+        mainPane.add(globePanels, 0, 0);
+        mainPane.add(addRemoveColumnPane, 1, 0);
+        mainPane.add(addRemoveRowPane, 0, 1);
 
-    	    if(primaryMon == screenNumber) {
-    	        primaryStage.setFullScreen(fullscreen);
-    	    } else {
-    	        for(int i=0; i<Screen.getScreens().size(); i++) {
-    	            if(i==screenNumber) {
-    	                Screen screen = Screen.getScreens().get(i);
-    	                primaryStage.setX(screen.getVisualBounds().getMinX());
-    	                primaryStage.setY(screen.getVisualBounds().getMinY());
-    	                primaryStage.setWidth(screen.getVisualBounds().getWidth());
-    	                primaryStage.setHeight(screen.getVisualBounds().getHeight());
-    	                primaryStage.initStyle(StageStyle.UNDECORATED);
-    	            }
-    	        }
-    	        
-    	    }
-    	    
-    	}
-    	
-    	primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+        mainPane.add(configButton, 1, 1);
+
+        ColumnConstraints mainCol = new ColumnConstraints();
+        mainCol.setHgrow(Priority.ALWAYS);
+        mainPane.getColumnConstraints().add(mainCol);
+
+        ColumnConstraints buttonCol = new ColumnConstraints();
+        buttonCol.setMaxWidth(2 * BUTTON_WIDTH);
+        buttonCol.setMinWidth(2 * BUTTON_WIDTH);
+        mainPane.getColumnConstraints().add(buttonCol);
+
+        RowConstraints mainRow = new RowConstraints();
+        mainRow.setVgrow(Priority.ALWAYS);
+        mainPane.getRowConstraints().add(mainRow);
+
+        RowConstraints rc = new RowConstraints();
+        rc.setMaxHeight(2 * BUTTON_WIDTH);
+        rc.setMinHeight(2 * BUTTON_WIDTH);
+        mainPane.getRowConstraints().add(rc);
+
+        primaryStage.setScene(new Scene(mainPane, 1280, 720));
+
+        boolean fullscreen = Configuration.getBooleanValue(
+                "uk.ac.rdg.resc.edal.multiglobe.Fullscreen", true);
+        int screenNumber = Configuration.getIntegerValue(
+                "uk.ac.rdg.resc.edal.multiglobe.ScreenNumber", 0);
+        if (fullscreen) {
+            int primaryMon = 0;
+            Screen primary = Screen.getPrimary();
+            for (int i = 0; i < Screen.getScreens().size(); i++) {
+                if (Screen.getScreens().get(i).equals(primary)) {
+                    primaryMon = i;
+                    System.out.println("primary: " + i);
+                    break;
+                }
+            }
+
+            if (primaryMon == screenNumber) {
+                primaryStage.setFullScreen(fullscreen);
+            } else {
+                for (int i = 0; i < Screen.getScreens().size(); i++) {
+                    if (i == screenNumber) {
+                        Screen screen = Screen.getScreens().get(i);
+                        primaryStage.setX(screen.getVisualBounds().getMinX());
+                        primaryStage.setY(screen.getVisualBounds().getMinY());
+                        primaryStage.setWidth(screen.getVisualBounds().getWidth());
+                        primaryStage.setHeight(screen.getVisualBounds().getHeight());
+                        primaryStage.initStyle(StageStyle.UNDECORATED);
+                    }
+                }
+
+            }
+
+        }
+
+        primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
             @Override
             public void handle(WindowEvent arg0) {
                 /*
@@ -237,19 +291,19 @@ public class VideoWall extends Application {
                  */
             }
         });
-    	
-    	primaryStage.show();
+
+        primaryStage.show();
     }
 
     public static void main(String[] args) {
-    	/*
-    	 * Set the config location
-    	 */
-    	System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
+        /*
+         * Set the config location
+         */
+        System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
 
-    	/*
-    	 * TODO set window class name
-    	 */
-    	launch(args);
+        /*
+         * TODO set window class name
+         */
+        launch(args);
     }
 }

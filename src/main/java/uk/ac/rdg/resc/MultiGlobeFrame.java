@@ -82,11 +82,15 @@ public class MultiGlobeFrame extends GridPane {
          */
         setStyle("-fx-base: #aaaaaa;");
 
+        /*
+         * Although the borders seem to not be redrawn properly, so set them to
+         * 0...
+         */
+        setHgap(0);
+        setVgap(0);
+
         setMaxHeight(Double.MAX_VALUE);
         setMaxWidth(Double.MAX_VALUE);
-
-        setHgap(1);
-        setVgap(1);
 
         /*
          * Initialise the frame to contain a single globe
