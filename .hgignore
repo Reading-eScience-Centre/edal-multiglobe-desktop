@@ -1,6 +1,0 @@
-syntax: glob
-target/
-.settings/
-.classpath
-.project
-.h2/
