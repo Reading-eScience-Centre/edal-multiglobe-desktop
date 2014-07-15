@@ -1,18 +1,3 @@
-package uk.ac.rdg.resc;
-
-import gov.nasa.worldwind.WorldWindow;
-import gov.nasa.worldwind.layers.Layer;
-import gov.nasa.worldwind.layers.LayerList;
-
-import java.awt.image.BufferedImage;
-
-import org.joda.time.DateTime;
-
-import uk.ac.rdg.resc.edal.domain.Extent;
-import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
-import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
-
 /*******************************************************************************
  * Copyright (c) 2014 The University of Reading All rights reserved.
  * 
@@ -38,6 +23,23 @@ import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************/
+
+package uk.ac.rdg.resc;
+
+import gov.nasa.worldwind.WorldWindow;
+import gov.nasa.worldwind.layers.Layer;
+import gov.nasa.worldwind.layers.LayerList;
+
+import java.awt.image.BufferedImage;
+
+import org.joda.time.DateTime;
+
+import uk.ac.rdg.resc.edal.domain.Extent;
+import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
+import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
+import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
+import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
+
 
 /**
  * Interface representing (but NOT necessarily extending) a {@link Layer} to
@@ -89,7 +91,7 @@ public interface EdalDataLayer extends PaletteSelectionHandler {
 	 */
 	public DateTime getTime();
 
-	/**
+    /**
 	 * @return The {@link VariableMetadata} information which applies to the
 	 *         currently selected layer
 	 */
@@ -99,7 +101,7 @@ public interface EdalDataLayer extends PaletteSelectionHandler {
 	 * @return The {@link WmsLayerMetadata} information which applies to the
 	 *         currently selected layer
 	 */
-	public WmsLayerMetadata getPlottingMetadata();
+	public NcwmsVariable getPlottingMetadata();
 
 	/**
 	 * Returns a legend representing the data colour scale

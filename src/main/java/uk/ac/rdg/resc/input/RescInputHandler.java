@@ -59,7 +59,7 @@ public class RescInputHandler extends AWTInputHandler {
     private int fingersOn = 0;
     private LinkedView view;
 
-    public RescInputHandler(SwingNode container, RescWorldWindow rescWorldWindow) {
+    public RescInputHandler(final SwingNode container, final RescWorldWindow rescWorldWindow) {
         setEventSource(rescWorldWindow);
         /*
          * Turn off smooth view changes. See overridden method
@@ -109,11 +109,8 @@ public class RescInputHandler extends AWTInputHandler {
             @Override
             public void handle(TouchEvent event) {
                 fingersOn = event.getTouchCount();
-//                System.out
-//                        .println("touch released, fingers " + fingersOn + ", tapping: " + tapping);
                 if (tapping && fingersOn == 1) {
                     tapping = false;
-//                    System.out.println("GFI from touch");
                     Position touchedPos = rescWorldWindow.getView().computePositionFromScreenPoint(
                             event.getTouchPoint().getX(), event.getTouchPoint().getY());
                     if (touchedPos != null) {
@@ -196,10 +193,15 @@ public class RescInputHandler extends AWTInputHandler {
                     if (event.getTouchCount() == 3) {
                         /*
                          * Treat 3-fingered scroll events as modifications to
-                         * the time/depth
+                         * the time/depth.
+                         * 
+                         * This transformation of deltaX/Y means that a half
+                         * panel scroll corresponds to the entire range. This
+                         * matches the size of the sliders.
                          */
-                        double deltaX = event.getDeltaX() / container.getBoundsInLocal().getWidth();
-                        double deltaY = event.getDeltaY()
+                        double deltaX = 2 * event.getDeltaX()
+                                / container.getBoundsInLocal().getWidth();
+                        double deltaY = 2 * event.getDeltaY()
                                 / container.getBoundsInLocal().getHeight();
                         /*
                          * Test whether this is a horizontal or vertical drag
@@ -230,13 +232,11 @@ public class RescInputHandler extends AWTInputHandler {
          * We only want true mouse clicks to register (i.e. not single press
          * touch events)
          */
-        //        System.out.println("MOUSE!!!");
         super.mouseClicked(mouseEvent);
         if (fingersOn == 0) {
-            if (!mouseEvent.isConsumed()) {
+            if (!mouseEvent.isConsumed() && mouseEvent.getButton() == MouseEvent.BUTTON1) {
                 Position clickPos = rescWorldWindow.getView().computePositionFromScreenPoint(
                         mouseEvent.getX(), mouseEvent.getY());
-                //                System.out.println("GFI from mouse");
                 if (clickPos != null) {
                     rescWorldWindow.getModel().showFeatureInfo(clickPos, true);
                     mouseEvent.consume();

@@ -64,6 +64,7 @@ import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue.FeaturesAndMemberName;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
+import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
 import uk.ac.rdg.resc.edal.util.Extents;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
@@ -105,8 +106,6 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 	private TemporalDomain tDomain;
 	/** The {@link VariableMetadata} associated with the layer */
 	private VariableMetadata metadata;
-	/** The {@link WmsLayerMetadata} associated with the layer */
-	private WmsLayerMetadata plottingMetadata;
 
 	/** The current colour scale range */
 	private Extent<Float> scaleRange;
@@ -167,7 +166,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 			this.timeRange = Extents.newExtent(this.time, this.time);
 		}
 
-		plottingMetadata = catalogue.getLayerMetadata(layerName);
+		WmsLayerMetadata plottingMetadata = catalogue.getLayerMetadata(layerName);
 		/*
 		 * Setup default colour scale values
 		 */
@@ -262,7 +261,17 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 
 	@Override
 	public void setOpacity(double opacity) {
-		dataLayer.setOpacity(opacity);
+	    if(dataLayer != null) {
+	        dataLayer.setOpacity(opacity);
+	    }
+	}
+	
+	@Override
+	public Double getOpacity() {
+	    if(dataLayer != null) {
+	        return dataLayer.getOpacity();
+	    }
+	    return null;
 	}
 
 	@Override
@@ -285,8 +294,9 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 	}
 
 	@Override
-	public WmsLayerMetadata getPlottingMetadata() {
-		return plottingMetadata;
+	public NcwmsVariable getPlottingMetadata() {
+	    return new NcwmsVariable(layerName, scaleRange, palette, underColor, overColor, bgColor,
+                logScale ? "log" : "linear", numColorBands);
 	}
 
 	@Override

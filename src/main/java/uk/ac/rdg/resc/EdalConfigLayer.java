@@ -36,7 +36,6 @@ import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.util.Logging;
 import gov.nasa.worldwindx.examples.util.ImageAnnotation;
 
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -253,6 +252,10 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         legendRefresh = true;
     }
 
+    public PaletteSelectorWidget getPaletteSelector() {
+        return paletteSelector;
+    }
+
     /**
      * Sets the legend to match a given {@link EdalDataLayer}
      * 
@@ -263,7 +266,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         this.edalDataLayer = edalDataLayer;
         WmsLayerMetadata plottingMetadata = edalDataLayer.getPlottingMetadata();
         if (plottingMetadata != null) {
-            paletteSelector.setPaletteProperties(plottingMetadata, Color.black, Color.black);
+            paletteSelector.setPaletteProperties(plottingMetadata);
         }
         legendRefresh = true;
         legendAnnotation.getAttributes().setVisible(true);
@@ -373,6 +376,21 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                  * which require it
                  */
             }
+        }
+    }
+
+    public void setLinkState(LinkedViewState linkedViewState) {
+        wwd.getView().setLinkState(linkedViewState);
+        switch (linkedViewState) {
+        case ANTILINKED:
+            linkStateButton.setImageSource(ANTILINK_BUTTON);
+            break;
+        case LINKED:
+            linkStateButton.setImageSource(LINK_BUTTON);
+            break;
+        case UNLINKED:
+            linkStateButton.setImageSource(UNLINK_BUTTON);
+            break;
         }
     }
 
@@ -510,5 +528,4 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
         legendAnnotation.getAttributes().setDrawOffset(
                 new Point(legend.getWidth() / 2, -legend.getHeight() + desiredSize));
     }
-
 }

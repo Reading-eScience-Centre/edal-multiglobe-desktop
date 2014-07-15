@@ -40,7 +40,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -48,7 +47,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.stage.Modality;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -59,6 +57,7 @@ import javax.xml.bind.JAXBException;
 import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
 import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
+import uk.ac.rdg.resc.edal.ncwms.config.NcwmsConfig;
 
 /**
  * Main class for the multi-globe video wall software.
@@ -73,8 +72,8 @@ public class VideoWall extends Application {
     private VBox addRemoveRowPane;
     private HBox addRemoveColumnPane;
     private GridPane mainPane;
-    
-    private Stage configWindow;
+
+    private Stage optionsWindow;
 
     public VideoWall() throws IOException, EdalException, JAXBException {
     }
@@ -133,9 +132,7 @@ public class VideoWall extends Application {
                 globePanels.removeRow();
             }
         });
-        /*
-         * TODO implement styling using CSS
-         */
+
         removeRowButton.setStyle("-fx-base: #000000;");
         removeRowButton.setTextFill(Color.LIGHTGRAY);
         removeRowButton.setMaxHeight(BUTTON_WIDTH);
@@ -158,9 +155,7 @@ public class VideoWall extends Application {
                 globePanels.addColumn();
             }
         });
-        /*
-         * TODO implement styling using CSS
-         */
+
         addColumnButton.setStyle("-fx-base: #000000;");
         addColumnButton.setTextFill(Color.LIGHTGRAY);
         addColumnButton.setMaxWidth(BUTTON_WIDTH);
@@ -176,9 +171,7 @@ public class VideoWall extends Application {
                 globePanels.removeColumn();
             }
         });
-        /*
-         * TODO implement styling using CSS
-         */
+
         removeColumnButton.setStyle("-fx-base: #000000;");
         removeColumnButton.setTextFill(Color.LIGHTGRAY);
         removeColumnButton.setMaxWidth(BUTTON_WIDTH);
@@ -192,16 +185,8 @@ public class VideoWall extends Application {
          * Config menu button to bring up window to load/save configs, exit
          * program, and anything else we might want
          */
-        
-        configWindow = new Stage();
-        Button a = new Button("A");
-        Button b = new Button("B");
-        VBox box = new VBox(a, b);
-        configWindow.setScene(new Scene(box, 100, 200));
-        configWindow.initModality(Modality.APPLICATION_MODAL);
-        configWindow.initOwner(primaryStage);
-        
-        
+        optionsWindow = new OptionsWindow(primaryStage, globePanels);
+
         Button configButton = new Button();
         configButton.setStyle("-fx-base: #000000;");
         Image buttonImage = new Image("images/config.png");
@@ -210,7 +195,7 @@ public class VideoWall extends Application {
         configButton.setOnAction(new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent e) {
-                configWindow.showAndWait();
+                optionsWindow.showAndWait();
             }
         });
 
@@ -223,7 +208,7 @@ public class VideoWall extends Application {
          * Black background between elements
          */
         mainPane.setStyle("-fx-base: #000000;");
-        
+
         mainPane.add(globePanels, 0, 0);
         mainPane.add(addRemoveColumnPane, 1, 0);
         mainPane.add(addRemoveRowPane, 0, 1);
@@ -283,12 +268,14 @@ public class VideoWall extends Application {
 
         }
 
-        primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+        primaryStage.setOnHiding(new EventHandler<WindowEvent>() {
             @Override
-            public void handle(WindowEvent arg0) {
+            public void handle(WindowEvent event) {
                 /*
-                 * Exit properly here
+                 * Shut down the dataset checking thread to allow the
+                 * application to exit
                  */
+                NcwmsConfig.shutdown();
             }
         });
 

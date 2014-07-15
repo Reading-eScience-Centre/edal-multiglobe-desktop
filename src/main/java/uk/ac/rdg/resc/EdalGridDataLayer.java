@@ -73,6 +73,7 @@ import uk.ac.rdg.resc.edal.grid.TimeAxis;
 import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.GridVariableMetadata;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
+import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
 import uk.ac.rdg.resc.edal.wms.GetMapStyleParams;
@@ -111,8 +112,6 @@ public class EdalGridDataLayer implements EdalDataLayer {
     private TimeAxis tAxis;
     /** The {@link VariableMetadata} associated with the layer */
     private GridVariableMetadata metadata;
-    /** The {@link WmsLayerMetadata} associated with the layer */
-    private WmsLayerMetadata plottingMetadata;
 
     /** The current colour scale range */
     private Extent<Float> scaleRange;
@@ -208,7 +207,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
          */
         threadPool = Executors.newFixedThreadPool(2);
 
-        plottingMetadata = catalogue.getLayerMetadata(layerName);
+        WmsLayerMetadata plottingMetadata = catalogue.getLayerMetadata(layerName);
         /*
          * Set up the default colour scale values
          */
@@ -329,6 +328,14 @@ public class EdalGridDataLayer implements EdalDataLayer {
             dataLayer.setOpacity(opacity);
         }
     }
+    
+    @Override
+    public Double getOpacity() {
+        if (dataLayer != null) {
+            return dataLayer.getOpacity();
+        }
+        return null;
+    }
 
     @Override
     public void bulkChange(Extent<Float> scaleRange, String palette, Color belowMin,
@@ -349,8 +356,9 @@ public class EdalGridDataLayer implements EdalDataLayer {
     }
 
     @Override
-    public WmsLayerMetadata getPlottingMetadata() {
-        return plottingMetadata;
+    public NcwmsVariable getPlottingMetadata() {
+        return new NcwmsVariable(layerName, scaleRange, palette, underColor, overColor, bgColor,
+                logScale ? "log" : "linear", numColorBands);
     }
 
     @Override
@@ -756,7 +764,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
         params.setValue(AVKey.DATASET_NAME, layerId);
         params.setValue(AVKey.FORMAT_SUFFIX, ".png");
         params.setValue(AVKey.NUM_EMPTY_LEVELS, 0);
-        
+
         if (latLon) {
             params.setValue(AVKey.NUM_LEVELS, 1);
             params.setValue(AVKey.TILE_WIDTH, totalX);

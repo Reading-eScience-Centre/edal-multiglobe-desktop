@@ -61,6 +61,8 @@ import uk.ac.rdg.resc.edal.feature.MapFeature;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.graphics.Charting;
+import uk.ac.rdg.resc.edal.grid.TimeAxis;
+import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
 import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.position.VerticalCrs;
@@ -182,6 +184,14 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         getLayers().add(fullScreenAnnotationLayer);
     }
 
+    public RescWorldWindow getWorldWindow() {
+        return wwd;
+    }
+
+    public EdalConfigLayer getConfigLayer() {
+        return edalConfigLayer;
+    }
+
     /**
      * Sets the display to use either a globe or a flat map
      * 
@@ -199,11 +209,33 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     /**
+     * @param projection
+     *            The projection to use when displaying a flat map
+     */
+    public void setProjection(Projection projection) {
+        this.flatProjection = projection;
+    }
+
+    /**
      * @return <code>true</code> if a flat map is currently selected,
      *         <code>false</code> if a 3d globe is selected
      */
     public boolean isFlat() {
         return flat;
+    }
+
+    /**
+     * @return The projection being used for the flat map
+     */
+    public Projection getProjection() {
+        return flatProjection;
+    }
+
+    /**
+     * @return The {@link EdalDataLayer} which this model is displaying
+     */
+    public EdalDataLayer getDataLayer() {
+        return edalDataLayer;
     }
 
     /**
@@ -320,11 +352,11 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      *            The fraction to change the slider by
      */
     public void changeElevationSlider(double frac) {
-        if(elevationSlider != null) {
+        if (elevationSlider != null) {
             elevationSlider.changeByFrac(frac);
         }
     }
-    
+
     /**
      * Changes the time slider by a fraction of the whole range
      * 
@@ -332,7 +364,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      *            The fraction to change the slider by
      */
     public void changeTimeSlider(double frac) {
-        if(timeSlider != null) {
+        if (timeSlider != null) {
             timeSlider.changeByFrac(frac);
         }
     }
@@ -346,11 +378,15 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      */
     private void addSliders(VariableMetadata layerMetadata) {
         /*
-         * Add an elevation slider if it is required, otherwise nullify an
-         * existing slider
+         * Add an elevation slider if it is required (i.e. we have a vertical
+         * domain, and if it's a vertical axis, it has at least two values),
+         * otherwise nullify an existing slider
          */
         VerticalDomain verticalDomain = layerMetadata.getVerticalDomain();
-        if (verticalDomain != null) {
+        if (verticalDomain != null
+                && !(verticalDomain instanceof VerticalAxis && ((VerticalAxis) verticalDomain)
+                        .getCoordinateValues().size() < 2)) {
+
             /*
              * Either create a new slider with the correct limits, or set the
              * limits on the existing one
@@ -417,11 +453,14 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
         }
 
         /*
-         * Add an elevation slider if it is required, otherwise nullify an
-         * existing slider
+         * Add an elevation slider if it is required (i.e. we have a temporal
+         * domain, and if it's a time axis, it has at least two values),
+         * otherwise nullify an existing slider
          */
         TemporalDomain tDomain = layerMetadata.getTemporalDomain();
-        if (tDomain != null) {
+        if (tDomain != null
+                && !(tDomain instanceof TimeAxis && ((TimeAxis) tDomain).getCoordinateValues()
+                        .size() < 2)) {
             /*
              * Either create a new slider with the correct limits, or set the
              * limits on the existing one.
@@ -497,14 +536,17 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      * @param position
      *            The {@link Position} at which to measure data and display the
      *            {@link FeatureInfoBalloon}
-     *            @param replaceExisting
-     *            Whether or not to pop up a new {@link FeatureInfoBalloon} if we already have one showing
+     * @param replaceExisting
+     *            Whether or not to pop up a new {@link FeatureInfoBalloon} if
+     *            we already have one showing
      */
     public void showFeatureInfo(final Position position, boolean replaceExisting) {
         /*
-         * Only display feature info if we have an active layer, and either don't have an existing balloon or want to replace the existing one
+         * Only display feature info if we have an active layer, and either
+         * don't have an existing balloon or want to replace the existing one
          */
-        if (edalLayerName != null && !edalLayerName.equals("") && ((balloon == null || !balloon.isActive()) || replaceExisting)) {
+        if (edalLayerName != null && !edalLayerName.equals("")
+                && ((balloon == null || !balloon.isActive()) || replaceExisting)) {
             /*
              * Delegate the actual work to a private method which can then be
              * called for all linked models.
@@ -829,7 +871,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
      * Make the projection values into an enum so that we can cycle through them
      * nicely
      */
-    enum Projection {
+    public enum Projection {
         MERCATOR {
             @Override
             public String getKey() {

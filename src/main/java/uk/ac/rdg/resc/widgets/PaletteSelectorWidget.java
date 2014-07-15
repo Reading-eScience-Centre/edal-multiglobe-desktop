@@ -394,16 +394,33 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
      *            The {@link Color} to use for data whose value is above the
      *            maximum scale value
      */
-    public void setPaletteProperties(WmsLayerMetadata plottingMetadata, Color belowMinColour,
-            Color aboveMaxColour) {
+    public void setPaletteProperties(WmsLayerMetadata plottingMetadata) {
         setMinScale(plottingMetadata.getColorScaleRange().getLow());
         setMaxScale(plottingMetadata.getColorScaleRange().getHigh());
 
         this.paletteName = plottingMetadata.getPalette();
         this.logScaling = plottingMetadata.isLogScaling();
         this.numColourBands = plottingMetadata.getNumColorBands();
-        this.belowMinColour = belowMinColour;
-        this.aboveMaxColour = aboveMaxColour;
+        this.belowMinColour = plottingMetadata.getBelowMinColour();
+        this.aboveMaxColour = plottingMetadata.getAboveMaxColour();
+
+        if (belowMinColour.getAlpha() == 0) {
+            belowMinState = ExtremeState.TRANSPARENT;
+        } else if (belowMinColour.getRed() == 0 && belowMinColour.getGreen() == 0
+                && belowMinColour.getBlue() == 0) {
+            belowMinState = ExtremeState.BLACK;
+        } else {
+            belowMinState = ExtremeState.EXTEND;
+        }
+        
+        if (aboveMaxColour.getAlpha() == 0) {
+            aboveMaxState = ExtremeState.TRANSPARENT;
+        } else if (aboveMaxColour.getRed() == 0 && aboveMaxColour.getGreen() == 0
+                && aboveMaxColour.getBlue() == 0) {
+            aboveMaxState = ExtremeState.BLACK;
+        } else {
+            aboveMaxState = ExtremeState.EXTEND;
+        }
 
         setupColourScheme();
         setupColourBar(1);
@@ -741,6 +758,11 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
          *            The overall opacity of the layer, from 0 to 1
          */
         public void setOpacity(double opacity);
+
+        /**
+         * @return The overall opacity of the layer, from 0 to 1
+         */
+        public Double getOpacity();
 
         /**
          * Changes multiple parameters at once

@@ -118,6 +118,31 @@ public class MultiGlobeFrame extends GridPane {
     }
 
     /**
+     * @param row
+     *            The index of the row
+     * @param column
+     *            The index of the column
+     * @return The model at the specified row/column
+     */
+    public RescModel getModelAt(int row, int column) {
+        return panels.get(getIndex(row, column)).getModel();
+    }
+
+    /**
+     * @return The number of rows in this {@link MultiGlobeFrame}
+     */
+    public int getRows() {
+        return rows;
+    }
+
+    /**
+     * @return The number of columns in this {@link MultiGlobeFrame}
+     */
+    public int getColumns() {
+        return columns;
+    }
+
+    /**
      * Adds a row to the bottom of the frame, creating as many new
      * {@link RescWorldWindow}s as are required
      */
@@ -161,7 +186,7 @@ public class MultiGlobeFrame extends GridPane {
      * @param columns
      *            The desired number of columns
      */
-    private void setShape(int rows, int columns) {
+    void setShape(int rows, int columns) {
         /*
          * Remove all necessary rows
          */
