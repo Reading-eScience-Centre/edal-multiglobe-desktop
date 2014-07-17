@@ -33,6 +33,16 @@ import gov.nasa.worldwind.util.Logging;
 import java.io.File;
 import java.util.List;
 
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+
 import javax.xml.bind.JAXBException;
 
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
@@ -41,14 +51,6 @@ import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.persist.VideoWallContents;
 import uk.ac.rdg.resc.persist.VideoWallLayout;
 import uk.ac.rdg.resc.persist.VideoWallRow;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
-import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
 
 /**
  * 
@@ -146,6 +148,7 @@ public class OptionsWindow extends Stage {
             public void handle(ActionEvent event) {
                 FileChooser chooser = new FileChooser();
                 chooser.setTitle("Choose file to save to");
+                chooser.setSelectedExtensionFilter(new ExtensionFilter("XML Files", "xml"));
                 File saveFile = chooser.showSaveDialog(OptionsWindow.this);
                 VideoWallLayout layout = VideoWallLayout.fromMultiGlobeFrame(frame);
                 try {

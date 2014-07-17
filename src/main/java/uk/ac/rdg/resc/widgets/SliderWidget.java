@@ -98,6 +98,10 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
      * Colour of the indicator element of the slider
      */
     protected Color elementColor;
+    /**
+     * Colour of the centre of the indicator element of the slider
+     */
+    protected Color centreColor;
 
     /**
      * The orientation of the slider. Can be {@link AVKey#HORIZONTAL} or
@@ -240,11 +244,10 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
         }
         this.value = value;
 
-        if (handler != null) {
+//        if (handler != null) {
 //            resetSliderTimer();
-            handler.sliderChanged(id, getValue(), getValueRange());
 //            sliderTimer.start();
-        }
+//        }
     }
 
     /**
@@ -317,17 +320,33 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
     /**
      * Sets the colour of the moveable element
      * 
-     * @param color
+     * @param colour
      *            The {@link Color} to use
      */
-    public void setElementColor(Color color) {
-        if (color == null) {
+    public void setElementColor(Color colour) {
+        if (colour == null) {
             String message = Logging.getMessage("nullValue.ColorIsNull");
             Logging.logger().severe(message);
             throw new IllegalArgumentException(message);
         }
 
-        this.elementColor = color;
+        this.elementColor = colour;
+    }
+    
+    /**
+     * Sets the colour of the centre of the moveable element
+     * 
+     * @param colour
+     *            The {@link Color} to use
+     */
+    public void setCentreColor(Color colour) {
+        if (colour == null) {
+            String message = Logging.getMessage("nullValue.ColorIsNull");
+            Logging.logger().severe(message);
+            throw new IllegalArgumentException(message);
+        }
+        
+        this.centreColor = colour;
     }
 
     // **************************************************************//
@@ -431,6 +450,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                 .getGL2()
                 .glTranslated(location.width + (CIRCLE_SIZE - CENTRE_SIZE) / 2,
                         location.height + (CIRCLE_SIZE - CENTRE_SIZE) / 2, 0);
+        applyColor(dc, centreColor, opacity, true);
         FrameFactory.drawBuffer(dc, GL.GL_TRIANGLE_FAN, centreElementBuffer);
     }
 
@@ -599,7 +619,7 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
                      */
                     if (handler != null) {
                         resetSliderTimer();
-                        handler.sliderChanged(id, getValue(), getValueRange());
+                        handler.sliderChanged(id, getValue(), getValueRange(), false);
                         sliderTimer.start();
                     }
                     /*
@@ -650,8 +670,13 @@ public class SliderWidget extends ScreenAnnotation implements SelectListener {
          *            The ID of the slider which has changed
          * @param value
          *            The double value which the slider has changed to
+         * @param valueRange
+         *            The value range which the slider has changed to
+         * @param calledFromLinked
+         *            Whether this method was called from a linked slider or not
          */
-        public void sliderChanged(String id, double value, Extent<Double> valueRange);
+        public void sliderChanged(String id, double value, Extent<Double> valueRange,
+                boolean calledFromLinked);
 
         /**
          * Formats a slider value as text

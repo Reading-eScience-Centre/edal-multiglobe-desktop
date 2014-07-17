@@ -52,6 +52,7 @@ import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
 import uk.ac.rdg.resc.edal.feature.GridFeature;
 import uk.ac.rdg.resc.edal.feature.MapFeature;
+import uk.ac.rdg.resc.edal.feature.PointFeature;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
@@ -64,7 +65,6 @@ import uk.ac.rdg.resc.edal.ncwms.config.NcwmsConfig.DatasetStorage;
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
 import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.util.CollectionUtils;
-import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
 import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
@@ -194,10 +194,9 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
             if (feature instanceof MapFeature) {
                 MapFeature mapFeature = (MapFeature) feature;
                 return mapFeature.getValues(varId).get(0, 0);
-            } else if (feature instanceof ProfileFeature) {
-                ProfileFeature profileFeature = (ProfileFeature) feature;
-                int index = GISUtils.getIndexOfClosestElevationTo(z, profileFeature.getDomain());
-                return profileFeature.getValues(varId).get(index);
+            } else if (feature instanceof PointFeature) {
+                PointFeature pointFeature = (PointFeature) feature;
+                return pointFeature.getValues(varId).get(0);
             } else {
                 return null;
             }

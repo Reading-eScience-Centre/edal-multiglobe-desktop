@@ -50,6 +50,7 @@ import org.jfree.chart.ChartUtilities;
 import org.jfree.chart.JFreeChart;
 import org.joda.time.DateTime;
 
+import uk.ac.rdg.resc.EdalGridDataLayer.CacheListener;
 import uk.ac.rdg.resc.LinkedView.LinkedViewState;
 import uk.ac.rdg.resc.edal.dataset.Dataset;
 import uk.ac.rdg.resc.edal.domain.Extent;
@@ -57,7 +58,7 @@ import uk.ac.rdg.resc.edal.domain.TemporalDomain;
 import uk.ac.rdg.resc.edal.domain.VerticalDomain;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
-import uk.ac.rdg.resc.edal.feature.MapFeature;
+import uk.ac.rdg.resc.edal.feature.GridFeature;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.graphics.Charting;
@@ -79,7 +80,7 @@ import uk.ac.rdg.resc.widgets.SliderWidgetAnnotation;
  * 
  * @author Guy Griffiths
  */
-public class RescModel extends BasicModel implements SliderWidgetHandler {
+public class RescModel extends BasicModel implements SliderWidgetHandler, CacheListener {
     /*
      * IDs for the 2 sliders which may be present
      */
@@ -275,7 +276,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              * Choose what type of EdalDataLayer to show
              */
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
-                    .getMapFeatureType(catalogue.getVariableFromId(layerName));
+                    .getFeatureType(catalogue.getVariableFromId(layerName));
 
             /*
              * Note that when we create an EdalDataLayer, it is not an instance
@@ -287,9 +288,9 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
              * the LayerList for this model so that it can add/remove layers
              * when necessary.
              */
-            if (MapFeature.class.isAssignableFrom(mapFeatureType)) {
+            if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
                 try {
-                    tempLayer = new EdalGridDataLayer(layerName, catalogue, getLayers(), wwd);
+                    tempLayer = new EdalGridDataLayer(layerName, catalogue, getLayers(), wwd, this);
                 } catch (EdalException e) {
                     String message = RescLogging.getMessage("resc.BadGridLayer");
                     Logging.logger().severe(message);
@@ -305,6 +306,10 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
                     e.printStackTrace();
                     return;
                 }
+            } else {
+                String message = RescLogging.getMessage("resc.UnsupportedLayerType", mapFeatureType);
+                Logging.logger().severe(message);
+                return;
             }
             /*
              * We have successfully instantiated the layer with no errors, so
@@ -785,7 +790,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
     }
 
     @Override
-    public void sliderChanged(String id, double value, Extent<Double> valueRange) {
+    public void sliderChanged(String id, double value, Extent<Double> valueRange, boolean calledFromLinked) {
         /*
          * If either slider has changed, update the value in the data layer
          */
@@ -900,6 +905,34 @@ public class RescModel extends BasicModel implements SliderWidgetHandler {
 
         public Projection getNext() {
             return values()[(ordinal() + 1) % values().length];
+        }
+    }
+
+    @Override
+    public void elevationCachingIncomplete() {
+        if(elevationSlider != null) {
+            elevationSlider.setNotCached();
+        }
+    }
+
+    @Override
+    public void elevationCachingComplete() {
+        if(elevationSlider != null) {
+            elevationSlider.setCached();
+        }
+    }
+
+    @Override
+    public void timeCachingIncomplete() {
+        if(timeSlider != null) {
+            timeSlider.setNotCached();
+        }
+    }
+
+    @Override
+    public void timeCachingComplete() {
+        if(timeSlider != null) {
+            timeSlider.setCached();
         }
     }
 }

@@ -138,6 +138,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     private int totalPointsX = -1;
     private int totalPointsY = -1;
     private boolean latLon = false;
+    private CacheListener cacheListener;
 
     /**
      * Instantiate a new {@link EdalGridDataLayer}
@@ -156,11 +157,12 @@ public class EdalGridDataLayer implements EdalDataLayer {
      *             cannot be found in the {@link VideoWallCatalogue}
      */
     public EdalGridDataLayer(String layerName, VideoWallCatalogue catalogue, LayerList layerList,
-            RescWorldWindow wwd) throws EdalException {
+            RescWorldWindow wwd, CacheListener cacheListener) throws EdalException {
         this.layerName = layerName;
         this.catalogue = catalogue;
         this.layerList = layerList;
         this.wwd = wwd;
+        this.cacheListener = cacheListener;
 
         VariableMetadata m = catalogue.getVariableMetadataForLayer(layerName);
         if (!(m instanceof GridVariableMetadata)) {
@@ -433,12 +435,12 @@ public class EdalGridDataLayer implements EdalDataLayer {
         threadPool = Executors.newFixedThreadPool(1);
 
         if (tAxis != null) {
-            timeCacheTask = new TimeCacher(time, elevation);
+            timeCacheTask = new TimeCacher(time, elevation, cacheListener);
             threadPool.submit(timeCacheTask);
         }
 
         if (zAxis != null) {
-            elevationCacheTask = new ElevationCacher(elevation, time);
+            elevationCacheTask = new ElevationCacher(elevation, time, cacheListener);
             threadPool.submit(elevationCacheTask);
         }
     }
@@ -792,16 +794,20 @@ public class EdalGridDataLayer implements EdalDataLayer {
         private boolean stop = false;
         private DateTime time;
         private Double elevation;
+        private CacheListener cacheListener;
 
-        public TimeCacher(final DateTime time, final Double elevation) {
+        public TimeCacher(final DateTime time, final Double elevation, final CacheListener cacheListener) {
             super();
             this.time = time;
             this.elevation = elevation;
+            this.cacheListener = cacheListener;
         }
 
         @Override
         public void run() {
-            long t1 = System.currentTimeMillis();
+            if(cacheListener != null) {
+                cacheListener.timeCachingIncomplete();
+            }
             int timeIndex = tAxis.findIndexOf(time);
             /*
              * Cache times above the current
@@ -823,8 +829,9 @@ public class EdalGridDataLayer implements EdalDataLayer {
             }
             String message = RescLogging.getMessage("resc.CachedTimes", layerName, elevation);
             Logging.logger().finer(message);
-            long t2 = System.currentTimeMillis();
-            System.out.println("All times cached " + (t2 - t1) + "ms");
+            if(cacheListener != null) {
+                cacheListener.timeCachingComplete();
+            }
         }
 
         public void stopCaching() {
@@ -841,15 +848,20 @@ public class EdalGridDataLayer implements EdalDataLayer {
         private boolean stop = false;
         private DateTime time;
         private Double elevation;
+        private CacheListener cacheListener;
 
-        public ElevationCacher(final Double elevation, final DateTime time) {
+        public ElevationCacher(final Double elevation, final DateTime time, final CacheListener cacheListener) {
             super();
             this.elevation = elevation;
             this.time = time;
+            this.cacheListener = cacheListener;
         }
 
         @Override
         public void run() {
+            if(cacheListener != null) {
+                cacheListener.elevationCachingIncomplete();
+            }
             int zIndex = zAxis.findIndexOf(elevation);
             /*
              * Cache elevations above the current
@@ -871,10 +883,32 @@ public class EdalGridDataLayer implements EdalDataLayer {
             }
             String message = RescLogging.getMessage("resc.CachedElevations", layerName, time);
             Logging.logger().finer(message);
+            if(cacheListener != null) {
+                cacheListener.elevationCachingComplete();
+            }
         }
 
         public void stopCaching() {
             stop = true;
         }
+    }
+    
+    interface CacheListener {
+        /**
+         * Called to indicate elevation caching is not finished
+         */
+        public void elevationCachingIncomplete();
+        /**
+         * Called when elevation caching is complete
+         */
+        public void elevationCachingComplete();
+        /**
+         * Called to indicate time caching is not finished
+         */
+        public void timeCachingIncomplete();
+        /**
+         * Called when time caching is complete
+         */
+        public void timeCachingComplete();
     }
 }

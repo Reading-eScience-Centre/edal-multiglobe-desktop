@@ -130,7 +130,8 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
          */
         sliderWidget = new SliderWidget(id, orientation, min, min, max, new SliderWidgetHandler() {
             @Override
-            public void sliderChanged(String id, double value, Extent<Double> valueRange) {
+            public void sliderChanged(String id, double value, Extent<Double> valueRange,
+                    boolean calledFromLinked) {
                 /*
                  * Update the value label, then pass the change event onto other
                  * listeners
@@ -141,14 +142,15 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
                     label.getAttributes().setVisible(true);
                 }
                 if (handler != null) {
-                    handler.sliderChanged(id, value, valueRange);
+                    handler.sliderChanged(id, value, valueRange, false);
                 }
                 for (SliderWidgetAnnotation linked : linkedSliders) {
-                    linked.sliderWidget.setValue(value);
                     linked.label.setText(formatSliderValue(id, value));
                     linked.label.getAttributes().setVisible(true);
+                    linked.sliderWidget.setValue(value);
+                    linked.sliderWidget.setValueRange(valueRange.getHigh() - valueRange.getLow());
                     if (linked.handler != null) {
-                        linked.handler.sliderChanged(id, value, valueRange);
+                        linked.handler.sliderChanged(id, value, valueRange, true);
                     }
                 }
             }
@@ -180,6 +182,7 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
             }
         }, wwd);
 
+        sliderWidget.setCentreColor(Color.yellow);
         addChild(sliderWidget);
 
         /*
@@ -195,6 +198,22 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
 
         addChild(label);
         label.getAttributes().setVisible(false);
+    }
+
+    /**
+     * Calls to set an indicator that changing this slider will not result in
+     * smooth transitions
+     */
+    public void setNotCached() {
+        sliderWidget.setCentreColor(Color.red);
+    }
+
+    /**
+     * Calls to set an indicator that changing this slider will result in smooth
+     * transitions
+     */
+    public void setCached() {
+        sliderWidget.setCentreColor(Color.green);
     }
 
     /**
@@ -245,9 +264,8 @@ public class SliderWidgetAnnotation extends ScreenAnnotation {
     }
 
     public void changeByFrac(double frac) {
-            double change = frac
-                    * (sliderWidget.max-sliderWidget.min);
-            setSliderValue(sliderWidget.value + change);
+        double change = frac * (sliderWidget.max - sliderWidget.min);
+        setSliderValue(sliderWidget.value + change);
     }
 
     /**
