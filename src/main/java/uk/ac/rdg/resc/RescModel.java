@@ -307,7 +307,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                     return;
                 }
             } else {
-                String message = RescLogging.getMessage("resc.UnsupportedLayerType", mapFeatureType);
+                String message = RescLogging
+                        .getMessage("resc.UnsupportedLayerType", mapFeatureType);
                 Logging.logger().severe(message);
                 return;
             }
@@ -790,7 +791,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     }
 
     @Override
-    public void sliderChanged(String id, double value, Extent<Double> valueRange, boolean calledFromLinked) {
+    public void sliderChanged(String id, double value, Extent<Double> valueRange,
+            boolean calledFromLinked) {
         /*
          * If either slider has changed, update the value in the data layer
          */
@@ -828,9 +830,19 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     public String formatSliderValue(String id, double value) {
         switch (id) {
         case ELEVATION_SLIDER:
-            return NUMBER_3DP.format(value) + " " + elevationUnits;
+            if (edalDataLayer instanceof EdalGridDataLayer) {
+                return NUMBER_3DP.format(((EdalGridDataLayer) edalDataLayer)
+                        .getElevationOnAxis(value)) + " " + elevationUnits;
+            } else {
+                return NUMBER_3DP.format(value) + " " + elevationUnits;
+            }
         case TIME_SLIDER:
-            return TimeUtils.formatUtcHumanReadableDateTime(new DateTime((long) value));
+            if (edalDataLayer instanceof EdalGridDataLayer) {
+                return TimeUtils.formatUtcHumanReadableDateTime(((EdalGridDataLayer) edalDataLayer)
+                        .getTimeOnAxis(new DateTime((long) value)));
+            } else {
+                return TimeUtils.formatUtcHumanReadableDateTime(new DateTime((long) value));
+            }
         default:
             return "";
         }
@@ -910,28 +922,28 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
 
     @Override
     public void elevationCachingIncomplete() {
-        if(elevationSlider != null) {
+        if (elevationSlider != null) {
             elevationSlider.setNotCached();
         }
     }
 
     @Override
     public void elevationCachingComplete() {
-        if(elevationSlider != null) {
+        if (elevationSlider != null) {
             elevationSlider.setCached();
         }
     }
 
     @Override
     public void timeCachingIncomplete() {
-        if(timeSlider != null) {
+        if (timeSlider != null) {
             timeSlider.setNotCached();
         }
     }
 
     @Override
     public void timeCachingComplete() {
-        if(timeSlider != null) {
+        if (timeSlider != null) {
             timeSlider.setCached();
         }
     }

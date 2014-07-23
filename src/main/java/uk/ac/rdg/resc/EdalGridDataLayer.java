@@ -259,12 +259,16 @@ public class EdalGridDataLayer implements EdalDataLayer {
          * Set to the nearest available elevation. Elevation range is ignored
          * for gridded data
          */
-        int zIndex = zAxis.findIndexOf(elevation);
-        double lastElevation = zAxis.getCoordinateValue(zIndex);
+        double lastElevation = getElevationOnAxis(elevation);
         if (this.elevation != lastElevation) {
             this.elevation = lastElevation;
             drawLayer();
         }
+    }
+    
+    public Double getElevationOnAxis(double elevation) {
+        int zIndex = zAxis.findIndexOf(elevation);
+        return zAxis.getCoordinateValue(zIndex);
     }
 
     @Override
@@ -278,13 +282,17 @@ public class EdalGridDataLayer implements EdalDataLayer {
          * Set to the nearest available time. Time range is ignored for gridded
          * data
          */
-        DateTime lastTime = GISUtils.getClosestTimeTo(time, tAxis);
+        DateTime lastTime = getTimeOnAxis(time);
         if (lastTime.getMillis() != this.time.getMillis()) {
             this.time = lastTime;
             drawLayer();
         }
     }
 
+    public DateTime getTimeOnAxis(DateTime time) {
+        return GISUtils.getClosestTimeTo(time, tAxis);
+    }
+    
     @Override
     public DateTime getTime() {
         return this.time;
