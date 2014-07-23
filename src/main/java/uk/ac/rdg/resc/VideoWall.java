@@ -42,8 +42,9 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.beans.PropertyVetoException;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.imageio.ImageIO;
 import javax.swing.BoxLayout;
@@ -66,11 +67,25 @@ import uk.ac.rdg.resc.logging.RescLogging;
 @SuppressWarnings("serial")
 public class VideoWall extends JFrame {
     private static final int BUTTON_WIDTH = 50;
+    ExecutorService threadPool;
 
     private VideoWallCatalogue datasetLoader;
     private MultiGlobeFrame globePanels;
 
-    public VideoWall() throws IOException, EdalException, JAXBException, PropertyVetoException {
+    private static VideoWall instance = null;
+
+    static VideoWall getInstance() {
+        if (instance == null) {
+            try {
+                instance = new VideoWall();
+            } catch (IOException | EdalException | JAXBException e) {
+                System.exit(0);
+            }
+        }
+        return instance;
+    }
+
+    public VideoWall() throws IOException, EdalException, JAXBException {
         init();
     }
 
@@ -81,9 +96,21 @@ public class VideoWall extends JFrame {
      * @throws JAXBException
      * @throws IOException
      * @throws EdalException
-     * @throws PropertyVetoException
      */
-    public void init() throws IOException, JAXBException, EdalException, PropertyVetoException {
+    public void init() throws IOException, JAXBException, EdalException {
+        int cachingThreads = Configuration.getIntegerValue(
+                "uk.ac.rdg.resc.edal.multiglobe.CachingThreads", 3);
+        if (cachingThreads < 1) {
+            cachingThreads = 1;
+        }
+        threadPool = Executors.newFixedThreadPool(cachingThreads);
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+            @Override
+            public void run() {
+                threadPool.shutdown();
+            }
+        }));
+
         Configuration.setValue(AVKey.VIEW_CLASS_NAME, LinkedView.class.getName());
 
         /*
@@ -168,7 +195,8 @@ public class VideoWall extends JFrame {
         addRemoveColumnPanel.add(removeColumnButton);
         addRemoveColumnPanel.add(addColumnButton);
 
-        JButton optionsButton = new JButton(new ImageIcon(ImageIO.read(this.getClass().getResource("/images/config.png"))));
+        JButton optionsButton = new JButton(new ImageIcon(ImageIO.read(this.getClass().getResource(
+                "/images/config.png"))));
         optionsButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -199,6 +227,10 @@ public class VideoWall extends JFrame {
     }
 
     public static void main(String[] args) throws IOException, EdalException, JAXBException {
+        /*
+         * Set the config location
+         */
+        System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
         try {
             /*
              * This code sets the X Windows property WM_CLASS to
@@ -219,13 +251,9 @@ public class VideoWall extends JFrame {
              */
         }
 
-        /*
-         * Set the config location
-         */
-        System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
-
         final boolean fullscreen = Configuration.getBooleanValue(
                 "uk.ac.rdg.resc.edal.multiglobe.Fullscreen", true);
+        System.out.println("fullscreen: " + fullscreen);
         final int screenNumber = Configuration.getIntegerValue(
                 "uk.ac.rdg.resc.edal.multiglobe.ScreenNumber", 0);
 
@@ -278,62 +306,3 @@ public class VideoWall extends JFrame {
         });
     }
 }
-
-/*
- * Shit that didn't work.
- */
-//JPanel overlayPanel = new JPanel();
-//JFXPanel jfxPanel = new JFXPanel();
-//jfxPanel.setOpaque(true);
-//
-//overlayPanel.setLayout(new OverlayLayout(overlayPanel));
-//overlayPanel.add(globePanels);
-//overlayPanel.add(jfxPanel);
-//overlayPanel.setComponentZOrder(globePanels, 1);
-//overlayPanel.setComponentZOrder(jfxPanel, 0);
-//overlayPanel.add(new Button("BUTTON"), 1);
-
-//overlayPanel.add(globePanels, 0);
-//overlayPanel.add(jfxPanel, 1);
-//jfxPanel.addMouseListener(new MouseListener() {
-//  @Override
-//  public void mouseReleased(MouseEvent e) {
-//  }
-//  
-//  @Override
-//  public void mousePressed(MouseEvent e) {
-//      System.out.println("mouse pressed in jfxpanel");
-//  }
-//  
-//  @Override
-//  public void mouseExited(MouseEvent e) {
-//  }
-//  
-//  @Override
-//  public void mouseEntered(MouseEvent e) {
-//      System.out.println("mouse entered jfxpanel");
-//  }
-//  
-//  @Override
-//  public void mouseClicked(MouseEvent e) {
-//  }
-//});
-//overlayPanel.add(jfxPanel, 0);
-//overlayPanel.add(new Button("BUTTON!!!"), 1);
-//
-//Platform.runLater(new Runnable() {
-//  @Override
-//  public void run() {
-//      MultiGlobeInputFrame input = new MultiGlobeInputFrame();
-//      Group root = new Group();
-//      Scene scene = new Scene(root);
-//      javafx.scene.control.Button button = new javafx.scene.control.Button("test");
-//      button.setMaxWidth(Double.MAX_VALUE);
-//      jfxPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
-//      root.getChildren().add(input);
-//      jfxPanel.setScene(scene);
-//      input.setShape(2, 2);
-//  }
-//});
-//add(overlayPanel, BorderLayout.CENTER);
-//add(jfxPanel, BorderLayout.CENTER);

@@ -9,6 +9,8 @@
     <Property name="uk.ac.rdg.resc.edal.multiglobe.Fullscreen" value="true"/>
     <!-- For multi-monitor systems, which screen should the fullscreen application run on -->
     <Property name="uk.ac.rdg.resc.edal.multiglobe.ScreenNumber" value="0"/>
+    <!-- Number of background threads to use for caching -->
+    <Property name="uk.ac.rdg.resc.edal.multiglobe.CachingThreads" value="7"/>
     <!-- This property is ignored and programmatically set to uk.ac.rdg.resc.LinkedView -->
     <!-- This is required for the multiglobe software to work. -->
     <!-- Changing or removing it has no effect -->

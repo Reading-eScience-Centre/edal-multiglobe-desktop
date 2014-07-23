@@ -924,6 +924,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     public void elevationCachingIncomplete() {
         if (elevationSlider != null) {
             elevationSlider.setNotCached();
+            wwd.redraw();
         }
     }
 
@@ -931,6 +932,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     public void elevationCachingComplete() {
         if (elevationSlider != null) {
             elevationSlider.setCached();
+            wwd.redraw();
         }
     }
 
@@ -938,6 +940,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     public void timeCachingIncomplete() {
         if (timeSlider != null) {
             timeSlider.setNotCached();
+            wwd.redraw();
         }
     }
 
@@ -945,6 +948,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     public void timeCachingComplete() {
         if (timeSlider != null) {
             timeSlider.setCached();
+            wwd.redraw();
         }
     }
 }
