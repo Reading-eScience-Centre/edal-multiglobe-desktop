@@ -309,8 +309,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                 }
             } else if (event.getTopObject() == linkButton) {
                 if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                    wwd.getView().setLinkState(LinkedViewState.LINKED);
-                    linkStateButton.setImageSource(LINK_BUTTON);
+                    setLinkState(LinkedViewState.LINKED);
                     removeRenderable(linkButton);
                     removeRenderable(antilinkButton);
                     removeRenderable(unlinkButton);
@@ -318,8 +317,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                 }
             } else if (event.getTopObject() == antilinkButton) {
                 if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                    wwd.getView().setLinkState(LinkedViewState.ANTILINKED);
-                    linkStateButton.setImageSource(ANTILINK_BUTTON);
+                    setLinkState(LinkedViewState.ANTILINKED);
                     removeRenderable(linkButton);
                     removeRenderable(antilinkButton);
                     removeRenderable(unlinkButton);
@@ -327,8 +325,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
                 }
             } else if (event.getTopObject() == unlinkButton) {
                 if (event.getEventAction().equals(SelectEvent.LEFT_CLICK)) {
-                    wwd.getView().setLinkState(LinkedViewState.UNLINKED);
-                    linkStateButton.setImageSource(UNLINK_BUTTON);
+                    setLinkState(LinkedViewState.UNLINKED);
                     removeRenderable(linkButton);
                     removeRenderable(antilinkButton);
                     removeRenderable(unlinkButton);
@@ -381,6 +378,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
 
     public void setLinkState(LinkedViewState linkedViewState) {
         wwd.getView().setLinkState(linkedViewState);
+        wwd.redrawNow();
         switch (linkedViewState) {
         case ANTILINKED:
             linkStateButton.setImageSource(ANTILINK_BUTTON);

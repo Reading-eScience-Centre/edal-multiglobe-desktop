@@ -79,11 +79,20 @@ public class LinkedView extends BasicOrbitView {
             Iterator<LinkedView> iterator = linkedViews.iterator();
             while (iterator.hasNext()) {
                 LinkedView linkedView = iterator.next();
-                if (linkedView.linkState == linkState) {
+                if (linkedView.linkState == LinkedViewState.LINKED) {
                     setLinkedCenterPosition(linkedView.getCenterPosition());
                     setLinkedZoom(linkedView.getZoom());
                     setLinkedHeading(linkedView.getHeading());
                     setLinkedPitch(linkedView.getPitch());
+                    break;
+                } else {
+                    this.linkState = linkState == LinkedViewState.LINKED ? LinkedViewState.ANTILINKED
+                            : LinkedViewState.LINKED;
+                    setLinkedCenterPosition(linkedView.getCenterPosition());
+                    setLinkedZoom(linkedView.getZoom());
+                    setLinkedHeading(linkedView.getHeading());
+                    setLinkedPitch(linkedView.getPitch());
+                    this.linkState = LinkedViewState.ANTILINKED;
                     break;
                 }
             }
