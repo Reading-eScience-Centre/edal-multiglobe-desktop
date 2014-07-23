@@ -28,35 +28,28 @@
 
 package uk.ac.rdg.resc;
 
+import java.awt.GridLayout;
 import java.io.IOException;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 
 import javafx.embed.swing.SwingNode;
-import javafx.scene.layout.ColumnConstraints;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.RowConstraints;
 
 import javax.swing.JPanel;
 
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 
 /**
- * A {@link JPanel} which can hold multiple {@link RescWorldWindow}s and has
+ * A {@link GridPane} which can hold multiple {@link RescWorldWindow}s and has
  * methods for creating and removing them
  * 
  * @author Guy Griffiths
  */
-public class MultiGlobeFrame extends GridPane {
-    private static final ColumnConstraints CC = new ColumnConstraints();
-    private static final RowConstraints RC = new RowConstraints();
-    static {
-        CC.setHgrow(Priority.ALWAYS);
-        RC.setVgrow(Priority.ALWAYS);
-    }
-
+@SuppressWarnings("serial")
+public class MultiGlobeFrame extends JPanel {
+    static final int GAP = 2;
+    
     /**
      * A list of {@link RescWorldWindow}s contained within this
      * {@link MultiGlobeFrame}
@@ -78,25 +71,9 @@ public class MultiGlobeFrame extends GridPane {
         this.featureCatalogue = featureCatalogue;
 
         /*
-         * This will be the colour of the borders between panels
-         */
-        setStyle("-fx-base: #aaaaaa;");
-
-        /*
-         * Although the borders seem to not be redrawn properly, so set them to
-         * 0...
-         */
-        setHgap(0);
-        setVgap(0);
-
-        setMaxHeight(Double.MAX_VALUE);
-        setMaxWidth(Double.MAX_VALUE);
-
-        /*
          * Initialise the frame to contain a single globe
          */
         setShape(1, 1);
-
     }
 
     /**
@@ -193,9 +170,8 @@ public class MultiGlobeFrame extends GridPane {
         while (this.rows > rows) {
             for (int i = this.columns - 1; i >= 0; i--) {
                 panels.remove(getIndex(this.rows - 1, i));
-                getChildren().remove(getIndex(this.rows - 1, i));
+                remove(getIndex(this.rows - 1, i));
             }
-            getRowConstraints().remove(getRowConstraints().size() - 1);
             this.rows--;
         }
 
@@ -205,9 +181,8 @@ public class MultiGlobeFrame extends GridPane {
         while (this.columns > columns) {
             for (int i = this.rows - 1; i >= 0; i--) {
                 panels.remove(getIndex(i, this.columns - 1));
-                getChildren().remove(getIndex(i, this.columns - 1));
+                remove(getIndex(i, this.columns - 1));
             }
-            getColumnConstraints().remove(getColumnConstraints().size() - 1);
             this.columns--;
         }
 
@@ -219,13 +194,10 @@ public class MultiGlobeFrame extends GridPane {
              * Add one panel at the bottom of each column
              */
             for (int i = 0; i < this.columns; i++) {
-                SwingNode panelNode = new SwingNode();
-                RescWorldWindow newPanel = getNewPanel(panelNode);
+                RescWorldWindow newPanel = getNewPanel(null);
                 panels.add(newPanel);
-                panelNode.setContent(newPanel);
-                add(panelNode, i, this.rows);
+                add(newPanel);
             }
-            getRowConstraints().add(RC);
             this.rows++;
         }
 
@@ -234,18 +206,21 @@ public class MultiGlobeFrame extends GridPane {
          */
         while (this.columns < columns) {
             /*
-             * Add from the bottom up, otherwise the indices change
+             * Add from the bottom up, otherwise the indexes change
              */
             for (int i = this.rows - 1; i >= 0; i--) {
-                SwingNode panelNode = new SwingNode();
-                RescWorldWindow newPanel = getNewPanel(panelNode);
+                RescWorldWindow newPanel = getNewPanel(null);
                 panels.add(getIndex(i, this.columns), newPanel);
-                panelNode.setContent(newPanel);
-                add(panelNode, this.columns, i);
+                add(newPanel, getIndex(i, this.columns));
             }
-            getColumnConstraints().add(CC);
             this.columns++;
         }
+
+        /*
+         * Now set the layout
+         */
+        GridLayout gridLayout = new GridLayout(rows, columns, GAP, GAP);
+        setLayout(gridLayout);
 
         /*
          * Redraw all panels, since their size will have changed
@@ -253,6 +228,11 @@ public class MultiGlobeFrame extends GridPane {
         for (RescWorldWindow panel : panels) {
             panel.redraw();
         }
+
+        /*
+         * validate() needs to be called after add/remove
+         */
+        this.validate();
     }
 
     /**

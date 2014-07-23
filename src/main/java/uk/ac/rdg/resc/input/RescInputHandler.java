@@ -36,8 +36,8 @@ import gov.nasa.worldwind.geom.Position;
 
 import java.awt.event.MouseEvent;
 
-import javafx.embed.swing.SwingNode;
 import javafx.event.EventHandler;
+import javafx.scene.Node;
 import javafx.scene.input.RotateEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.input.TouchEvent;
@@ -59,7 +59,7 @@ public class RescInputHandler extends AWTInputHandler {
     private int fingersOn = 0;
     private LinkedView view;
 
-    public RescInputHandler(final SwingNode container, final RescWorldWindow rescWorldWindow) {
+    public RescInputHandler(final Node container, final RescWorldWindow rescWorldWindow) {
         setEventSource(rescWorldWindow);
         /*
          * Turn off smooth view changes. See overridden method
@@ -70,160 +70,163 @@ public class RescInputHandler extends AWTInputHandler {
         /*
          * Now add handlers for JavaFX events
          */
+        if (container != null) {
+            /*
+             * Keep track of the number of fingers on the screen so that we can
+             * separate e.g. zoom events and scroll events
+             */
+            container.setOnTouchPressed(new EventHandler<TouchEvent>() {
+                @Override
+                public void handle(TouchEvent event) {
+                    fingersOn = event.getTouchCount();
 
-        /*
-         * Keep track of the number of fingers on the screen so that we can
-         * separate e.g. zoom events and scroll events
-         */
-        container.setOnTouchPressed(new EventHandler<TouchEvent>() {
-            @Override
-            public void handle(TouchEvent event) {
-                fingersOn = event.getTouchCount();
-
-                if (fingersOn == 1) {
-                    (new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            tapping = true;
-                            /*
-                             * Sleep for 0.05 second and then finish
-                             */
-                            try {
-                                Thread.sleep(100L);
-                            } catch (InterruptedException e) {
+                    if (fingersOn == 1) {
+                        (new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tapping = true;
                                 /*
-                                 * Don't do anything - the timer was interrupted
-                                 * deliberately
+                                 * Sleep for 0.05 second and then finish
                                  */
+                                try {
+                                    Thread.sleep(100L);
+                                } catch (InterruptedException e) {
+                                    /*
+                                     * Don't do anything - the timer was
+                                     * interrupted deliberately
+                                     */
+                                }
+                                tapping = false;
                             }
-                            tapping = false;
-                        }
-                    })).start();
-                } else {
-                    tapping = false;
-                }
-            }
-        });
-
-        container.setOnTouchReleased(new EventHandler<TouchEvent>() {
-            @Override
-            public void handle(TouchEvent event) {
-                fingersOn = event.getTouchCount();
-                if (tapping && fingersOn == 1) {
-                    tapping = false;
-                    Position touchedPos = rescWorldWindow.getView().computePositionFromScreenPoint(
-                            event.getTouchPoint().getX(), event.getTouchPoint().getY());
-                    if (touchedPos != null) {
-                        rescWorldWindow.getModel().showFeatureInfo(touchedPos, false);
-                        event.consume();
+                        })).start();
+                    } else {
+                        tapping = false;
                     }
                 }
-            }
-        });
+            });
 
-        container.setOnTouchMoved(new EventHandler<TouchEvent>() {
-            @Override
-            public void handle(TouchEvent event) {
-                if (fingersOn == 1) {
-
+            container.setOnTouchReleased(new EventHandler<TouchEvent>() {
+                @Override
+                public void handle(TouchEvent event) {
+                    fingersOn = event.getTouchCount();
+                    if (tapping && fingersOn == 1) {
+                        tapping = false;
+                        Position touchedPos = rescWorldWindow.getView()
+                                .computePositionFromScreenPoint(event.getTouchPoint().getX(),
+                                        event.getTouchPoint().getY());
+                        if (touchedPos != null) {
+                            rescWorldWindow.getModel().showFeatureInfo(touchedPos, false);
+                            event.consume();
+                        }
+                    }
                 }
-            }
-        });
+            });
 
-        /*
-         * Handler for the 2-finger rotate event
-         */
-        container.setOnRotate(new EventHandler<RotateEvent>() {
-            @Override
-            public void handle(RotateEvent re) {
-                double angle = re.getAngle();
+            container.setOnTouchMoved(new EventHandler<TouchEvent>() {
+                @Override
+                public void handle(TouchEvent event) {
+                    if (fingersOn == 1) {
 
-                if (fingersOn == 2) {
-                    view.changeHeading(Angle.fromDegrees(-angle));
-                    view.firePropertyChange(AVKey.VIEW, null, view);
+                    }
                 }
-            }
-        });
+            });
 
-        /*
-         * Handler for the 2-finger zoom event
-         */
-        container.setOnZoom(new EventHandler<ZoomEvent>() {
-            @Override
-            public void handle(ZoomEvent ze) {
-                if (fingersOn == 2) {
-                    view.changeZoom(1.0 / ze.getZoomFactor());
-                    view.firePropertyChange(AVKey.VIEW, null, view);
+            /*
+             * Handler for the 2-finger rotate event
+             */
+            container.setOnRotate(new EventHandler<RotateEvent>() {
+                @Override
+                public void handle(RotateEvent re) {
+                    double angle = re.getAngle();
+
+                    if (fingersOn == 2) {
+                        view.changeHeading(Angle.fromDegrees(-angle));
+                        view.firePropertyChange(AVKey.VIEW, null, view);
+                    }
                 }
-            }
-        });
+            });
 
-        /*
-         * The difference between touch scroll events and mouse scroll events is
-         * that touch ones generate start and end events. We can use this to
-         * keep track of whether a scroll event is a touch event or not
-         */
-        container.setOnScrollStarted(new EventHandler<ScrollEvent>() {
-            @Override
-            public void handle(ScrollEvent event) {
-                touchScroll = true;
-            }
-        });
+            /*
+             * Handler for the 2-finger zoom event
+             */
+            container.setOnZoom(new EventHandler<ZoomEvent>() {
+                @Override
+                public void handle(ZoomEvent ze) {
+                    if (fingersOn == 2) {
+                        view.changeZoom(1.0 / ze.getZoomFactor());
+                        view.firePropertyChange(AVKey.VIEW, null, view);
+                    }
+                }
+            });
 
-        container.setOnScrollFinished(new EventHandler<ScrollEvent>() {
-            @Override
-            public void handle(ScrollEvent event) {
-                touchScroll = false;
-            }
-        });
+            /*
+             * The difference between touch scroll events and mouse scroll
+             * events is that touch ones generate start and end events. We can
+             * use this to keep track of whether a scroll event is a touch event
+             * or not
+             */
+            container.setOnScrollStarted(new EventHandler<ScrollEvent>() {
+                @Override
+                public void handle(ScrollEvent event) {
+                    touchScroll = true;
+                }
+            });
 
-        container.setOnScroll(new EventHandler<ScrollEvent>() {
-            @Override
-            public void handle(ScrollEvent event) {
-                if (touchScroll || event.isInertia()) {
-                    /*
-                     * This is a scroll event generated by touch (either
-                     * currently or in the past).
-                     * 
-                     * We may want to use this to adjust the pitch angle, but
-                     * that's probably not a widely used view alteration and may
-                     * cause more hassle than it's worth.
-                     */
-                    event.consume();
-                    if (event.getTouchCount() == 3) {
+            container.setOnScrollFinished(new EventHandler<ScrollEvent>() {
+                @Override
+                public void handle(ScrollEvent event) {
+                    touchScroll = false;
+                }
+            });
+
+            container.setOnScroll(new EventHandler<ScrollEvent>() {
+                @Override
+                public void handle(ScrollEvent event) {
+                    if (touchScroll || event.isInertia()) {
                         /*
-                         * Treat 3-fingered scroll events as modifications to
-                         * the time/depth.
+                         * This is a scroll event generated by touch (either
+                         * currently or in the past).
                          * 
-                         * This transformation of deltaX/Y means that a half
-                         * panel scroll corresponds to the entire range. This
-                         * matches the size of the sliders.
+                         * We may want to use this to adjust the pitch angle,
+                         * but that's probably not a widely used view alteration
+                         * and may cause more hassle than it's worth.
                          */
-                        double deltaX = 2 * event.getDeltaX()
-                                / container.getBoundsInLocal().getWidth();
-                        double deltaY = 2 * event.getDeltaY()
-                                / container.getBoundsInLocal().getHeight();
-                        /*
-                         * Test whether this is a horizontal or vertical drag
-                         * and change time/elevation accordingly
-                         */
-                        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                            rescWorldWindow.getModel().changeTimeSlider(deltaX);
-                        } else {
-                            rescWorldWindow.getModel().changeElevationSlider(deltaY);
+                        event.consume();
+                        if (event.getTouchCount() == 3) {
+                            /*
+                             * Treat 3-fingered scroll events as modifications
+                             * to the time/depth.
+                             * 
+                             * This transformation of deltaX/Y means that a half
+                             * panel scroll corresponds to the entire range.
+                             * This matches the size of the sliders.
+                             */
+                            double deltaX = 2 * event.getDeltaX()
+                                    / container.getBoundsInLocal().getWidth();
+                            double deltaY = 2 * event.getDeltaY()
+                                    / container.getBoundsInLocal().getHeight();
+                            /*
+                             * Test whether this is a horizontal or vertical
+                             * drag and change time/elevation accordingly
+                             */
+                            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                                rescWorldWindow.getModel().changeTimeSlider(deltaX);
+                            } else {
+                                rescWorldWindow.getModel().changeElevationSlider(deltaY);
+                            }
                         }
+                    } else {
+                        /*
+                         * We don't want touch scrolling to zoom, only mouse
+                         * scrolling.
+                         */
+                        view.changeZoom(1.0 - event.getDeltaY() / 200.0);
+                        view.firePropertyChange(AVKey.VIEW, null, view);
                     }
-                } else {
-                    /*
-                     * We don't want touch scrolling to zoom, only mouse
-                     * scrolling.
-                     */
-                    view.changeZoom(1.0 - event.getDeltaY() / 200.0);
-                    view.firePropertyChange(AVKey.VIEW, null, view);
+                    event.consume();
                 }
-                event.consume();
-            }
-        });
+            });
+        }
     }
 
     @Override

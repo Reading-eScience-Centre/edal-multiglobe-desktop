@@ -4,3 +4,5 @@
 .settings/
 *.log
 .h2/
+
+*.index.ser

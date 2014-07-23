@@ -31,7 +31,12 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.Model;
 import gov.nasa.worldwind.View;
 import gov.nasa.worldwind.WorldWindow;
-import gov.nasa.worldwind.awt.WorldWindowGLJPanel;
+import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
+import gov.nasa.worldwind.geom.Position;
+
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+
 import javafx.embed.swing.SwingNode;
 import uk.ac.rdg.resc.input.RescInputHandler;
 
@@ -44,7 +49,7 @@ import uk.ac.rdg.resc.input.RescInputHandler;
  * @author Guy Griffiths
  */
 @SuppressWarnings("serial")
-public class RescWorldWindow extends WorldWindowGLJPanel {
+public class RescWorldWindow extends WorldWindowGLCanvas {
     /**
      * Instantiates a new {@link RescWorldWindow}.
      * 
@@ -71,34 +76,34 @@ public class RescWorldWindow extends WorldWindowGLJPanel {
          * We need to add a listener for clicks on the globe to display
          * information and graphs when layers are clicked
          */
-//        addMouseListener(new MouseListener() {
-//            @Override
-//            public void mouseClicked(MouseEvent e) {
-//                if (!e.isConsumed()) {
-//                    Position currentPosition = getCurrentPosition();
-//                    if (currentPosition != null) {
-//                        getModel().showFeatureInfo(currentPosition);
-//                        e.consume();
-//                    }
-//                }
-//            }
-//
-//            @Override
-//            public void mouseReleased(MouseEvent e) {
-//            }
-//
-//            @Override
-//            public void mousePressed(MouseEvent e) {
-//            }
-//
-//            @Override
-//            public void mouseExited(MouseEvent e) {
-//            }
-//
-//            @Override
-//            public void mouseEntered(MouseEvent e) {
-//            }
-//        });
+        addMouseListener(new MouseListener() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (!e.isConsumed()) {
+                    Position currentPosition = getCurrentPosition();
+                    if (currentPosition != null) {
+                        getModel().showFeatureInfo(currentPosition, true);
+                        e.consume();
+                    }
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+            }
+        });
     }
 
     @Override
