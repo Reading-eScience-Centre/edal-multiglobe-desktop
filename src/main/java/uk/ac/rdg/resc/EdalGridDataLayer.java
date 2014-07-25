@@ -134,6 +134,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     private int totalPointsY = -1;
     private boolean latLon = false;
     private CacheListener cacheListener;
+    private boolean cachingEnabled = false;
 
     /**
      * Instantiate a new {@link EdalGridDataLayer}
@@ -220,7 +221,10 @@ public class EdalGridDataLayer implements EdalDataLayer {
         /*
          * Now create the layer and add it to the layer list
          */
-        drawLayer();
+        dataLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale,
+                numColorBands, bgColor, underColor, overColor, latLon, totalPointsX,
+                totalPointsY);
+        layerList.add(dataLayer);
     }
 
     @Override
@@ -253,7 +257,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
             drawLayer();
         }
     }
-    
+
     public Double getElevationOnAxis(double elevation) {
         int zIndex = zAxis.findIndexOf(elevation);
         return zAxis.getCoordinateValue(zIndex);
@@ -280,7 +284,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     public DateTime getTimeOnAxis(DateTime time) {
         return GISUtils.getClosestTimeTo(time, tAxis);
     }
-    
+
     @Override
     public DateTime getTime() {
         return this.time;
@@ -326,7 +330,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
             dataLayer.setOpacity(opacity);
         }
     }
-    
+
     @Override
     public Double getOpacity() {
         if (dataLayer != null) {
@@ -363,8 +367,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
     public BufferedImage getLegend(int size, boolean labels) {
         if (dataLayer != null) {
             try {
-                return dataLayer.mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0, 150),
-                        labels, LEGEND_WIDTH);
+                return dataLayer.mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0,
+                        150), labels, LEGEND_WIDTH);
             } catch (EdalException e) {
                 String message = RescLogging.getMessage("resc.DataReadingProblem");
                 Logging.logger().warning(message);
@@ -381,21 +385,10 @@ public class EdalGridDataLayer implements EdalDataLayer {
      * changed and the layer needs redrawing.
      */
     private void drawLayer() {
-        double opacity = 1.0;
-        if (dataLayer != null) {
-            opacity = dataLayer.getOpacity();
-            layerList.remove(dataLayer);
-        }
-        /*
-         * Because worldwind is geared up to displaying static layers, when we
-         * change some parameters, we simply remove the old layer and add a
-         * newly-created one.
-         */
-        dataLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale, numColorBands,
-                bgColor, underColor, overColor, latLon, totalPointsX, totalPointsY);
-        dataLayer.setOpacity(opacity);
-        layerList.add(dataLayer);
-        wwd.redraw();
+        dataLayer.elevation = elevation;
+        dataLayer.time = time;
+        dataLayer.setExpiryTime(System.currentTimeMillis());
+        dataLayer.firePropertyChange(AVKey.LAYER, null, dataLayer);
     }
 
     /**
@@ -410,21 +403,25 @@ public class EdalGridDataLayer implements EdalDataLayer {
      * will not be recomputed, so this method should be quick to run.
      */
     public void cacheFromCurrent() {
-        if (timeCacheTask != null) {
-            timeCacheTask.stopCaching();
-        }
-        if (elevationCacheTask != null) {
-            elevationCacheTask.stopCaching();
-        }
+        if (!cachingEnabled) {
+            return;
+        } else {
+            if (timeCacheTask != null) {
+                timeCacheTask.stopCaching();
+            }
+            if (elevationCacheTask != null) {
+                elevationCacheTask.stopCaching();
+            }
 
-        if (tAxis != null) {
-            timeCacheTask = new TimeCacher(time, elevation, cacheListener);
-            VideoWall.getInstance().threadPool.submit(timeCacheTask);
-        }
+            if (tAxis != null) {
+                timeCacheTask = new TimeCacher(time, elevation, cacheListener);
+                VideoWall.getInstance().threadPool.submit(timeCacheTask);
+            }
 
-        if (zAxis != null) {
-            elevationCacheTask = new ElevationCacher(elevation, time, cacheListener);
-            VideoWall.getInstance().threadPool.submit(elevationCacheTask);
+            if (zAxis != null) {
+                elevationCacheTask = new ElevationCacher(elevation, time, cacheListener);
+                VideoWall.getInstance().threadPool.submit(elevationCacheTask);
+            }
         }
     }
 
@@ -538,7 +535,21 @@ public class EdalGridDataLayer implements EdalDataLayer {
 
             setForceLevelZeroLoads(true);
             setRetainLevelZeroTiles(true);
+
+            String layerId = getKey();
+            getLevels().setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
+            getLevels().setValue(AVKey.DATASET_NAME, layerId);
         }
+
+        private String getKey() {
+            String layerId = layerName + ":" + elevation + ":" + time + ":" + palette + ":"
+                    + scaleRange.toString() + ":" + logScale + ":" + numColorBands + ":" + bgColor
+                    + ":" + underColor + underColor.getAlpha() + ":" + overColor
+                    + overColor.getAlpha();
+            return UUID.nameUUIDFromBytes(layerId.getBytes()).toString();
+        }
+
+        Map<PlottingDomainParams, BufferedImage> imageCache = new HashMap<>();
 
         /**
          * Generates the image for a given {@link TextureTile}
@@ -563,7 +574,14 @@ public class EdalGridDataLayer implements EdalDataLayer {
             PlottingDomainParams params = new PlottingDomainParams(width, height, bbox, null, null,
                     null, elevation, time);
             try {
-                return mapImage.drawImage(params, catalogue);
+                
+                if (imageCache.containsKey(params)) {
+                    return imageCache.get(params);
+                } else {
+                    BufferedImage image = mapImage.drawImage(params, catalogue);
+                    imageCache.put(params, image);
+                    return image;
+                }
             } catch (EdalException e) {
                 /*
                  * Problem generating an image. Log and return a standard image
@@ -650,7 +668,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
                  * GPU texture caching might mean that this is unnecessary, but
                  * it doesn't slow things down noticeably keeping it in.
                  */
-                wwd.redraw();
+                //                wwd.redraw();
             }
 
             /*
@@ -737,16 +755,14 @@ public class EdalGridDataLayer implements EdalDataLayer {
          * Create a unique ID for the layer based on all adjustable settings.
          * This is for caching purposes.
          */
-        String layerId = layerName + ":" + elevation + ":" + time + ":" + palette + ":"
-                + scaleRange.toString() + ":" + logScale + ":" + numColorBands + ":" + bgColor
-                + ":" + underColor + underColor.getAlpha() + ":" + overColor + overColor.getAlpha();
-        layerId = UUID.nameUUIDFromBytes(layerId.getBytes()).toString();
 
         AVList params = new AVListImpl();
 
+        String layerId = layerName + "-initial";
         params.setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
-        params.setValue(AVKey.SERVICE, "*");
         params.setValue(AVKey.DATASET_NAME, layerId);
+
+        params.setValue(AVKey.SERVICE, "*");
         params.setValue(AVKey.FORMAT_SUFFIX, ".png");
         params.setValue(AVKey.NUM_EMPTY_LEVELS, 0);
 
@@ -779,7 +795,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
         private Double elevation;
         private CacheListener cacheListener;
 
-        public TimeCacher(final DateTime time, final Double elevation, final CacheListener cacheListener) {
+        public TimeCacher(final DateTime time, final Double elevation,
+                final CacheListener cacheListener) {
             this.time = time;
             this.elevation = elevation;
             this.cacheListener = cacheListener;
@@ -787,8 +804,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
 
         @Override
         public void run() {
-            Thread.currentThread().setName("time-cache-"+layerName);
-            if(cacheListener != null) {
+            Thread.currentThread().setName("time-cache-" + layerName);
+            if (cacheListener != null) {
                 cacheListener.timeCachingIncomplete();
             }
             int timeIndex = tAxis.findIndexOf(time);
@@ -797,7 +814,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
              */
             for (int i = timeIndex + 1; i < tAxis.size(); i++) {
                 if (stop) {
-                    if(cacheListener != null) {
+                    if (cacheListener != null) {
                         cacheListener.timeCachingComplete();
                     }
                     return;
@@ -809,7 +826,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
              */
             for (int i = timeIndex - 1; i >= 0; i--) {
                 if (stop) {
-                    if(cacheListener != null) {
+                    if (cacheListener != null) {
                         cacheListener.timeCachingComplete();
                     }
                     return;
@@ -818,7 +835,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
             }
             String message = RescLogging.getMessage("resc.CachedTimes", layerName, elevation);
             Logging.logger().finer(message);
-            if(cacheListener != null) {
+            if (cacheListener != null) {
                 cacheListener.timeCachingComplete();
             }
         }
@@ -839,7 +856,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
         private Double elevation;
         private CacheListener cacheListener;
 
-        public ElevationCacher(final Double elevation, final DateTime time, final CacheListener cacheListener) {
+        public ElevationCacher(final Double elevation, final DateTime time,
+                final CacheListener cacheListener) {
             this.elevation = elevation;
             this.time = time;
             this.cacheListener = cacheListener;
@@ -847,8 +865,8 @@ public class EdalGridDataLayer implements EdalDataLayer {
 
         @Override
         public void run() {
-            Thread.currentThread().setName("elevation-cache-"+layerName);
-            if(cacheListener != null) {
+            Thread.currentThread().setName("elevation-cache-" + layerName);
+            if (cacheListener != null) {
                 cacheListener.elevationCachingIncomplete();
             }
             int zIndex = zAxis.findIndexOf(elevation);
@@ -866,7 +884,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
              */
             for (int i = zIndex - 1; i >= 0; i--) {
                 if (stop) {
-                    if(cacheListener != null) {
+                    if (cacheListener != null) {
                         cacheListener.elevationCachingComplete();
                     }
                     return;
@@ -875,7 +893,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
             }
             String message = RescLogging.getMessage("resc.CachedElevations", layerName, time);
             Logging.logger().finer(message);
-            if(cacheListener != null) {
+            if (cacheListener != null) {
                 cacheListener.elevationCachingComplete();
             }
         }
@@ -884,20 +902,23 @@ public class EdalGridDataLayer implements EdalDataLayer {
             stop = true;
         }
     }
-    
+
     interface CacheListener {
         /**
          * Called to indicate elevation caching is not finished
          */
         public void elevationCachingIncomplete();
+
         /**
          * Called when elevation caching is complete
          */
         public void elevationCachingComplete();
+
         /**
          * Called to indicate time caching is not finished
          */
         public void timeCachingIncomplete();
+
         /**
          * Called when time caching is complete
          */
