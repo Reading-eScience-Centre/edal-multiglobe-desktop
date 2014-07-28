@@ -35,8 +35,15 @@ import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.geom.Position;
 import gov.nasa.worldwind.globes.Earth;
 import gov.nasa.worldwind.globes.EarthFlat;
-import gov.nasa.worldwind.globes.FlatGlobe;
+import gov.nasa.worldwind.globes.GeographicProjection;
+import gov.nasa.worldwind.globes.projections.ProjectionCautra;
+import gov.nasa.worldwind.globes.projections.ProjectionEquirectangular;
+import gov.nasa.worldwind.globes.projections.ProjectionMercator;
+import gov.nasa.worldwind.globes.projections.ProjectionModifiedSinusoidal;
+import gov.nasa.worldwind.globes.projections.ProjectionPolarEquidistant;
+import gov.nasa.worldwind.globes.projections.ProjectionSinusoidal;
 import gov.nasa.worldwind.layers.AnnotationLayer;
+import gov.nasa.worldwind.layers.Layer;
 import gov.nasa.worldwind.util.Logging;
 
 import java.awt.Color;
@@ -290,7 +297,11 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
              */
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
                 try {
-                    tempLayer = new EdalGridDataLayer(layerName, catalogue, getLayers(), wwd, this);
+                    tempLayer = new EdalGridDataLayer(layerName, catalogue, this, wwd);
+                    /*
+                     * TODO make EdalDataLayer implement Layer and remove the cast.
+                     */
+                    getLayers().add((Layer) tempLayer);
                 } catch (EdalException e) {
                     String message = RescLogging.getMessage("resc.BadGridLayer");
                     Logging.logger().severe(message);
@@ -322,6 +333,10 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                  * from the layer list
                  */
                 edalDataLayer.destroy();
+                if(edalDataLayer instanceof EdalGridDataLayer) {
+                    EdalGridDataLayer edalGridDataLayer = (EdalGridDataLayer) edalDataLayer;
+                    getLayers().remove(edalGridDataLayer);
+                }
             }
 
             edalDataLayer = tempLayer;
@@ -891,29 +906,47 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     public enum Projection {
         MERCATOR {
             @Override
-            public String getKey() {
-                return FlatGlobe.PROJECTION_MERCATOR;
+            public GeographicProjection getKey() {
+                return new ProjectionMercator();
             }
         },
         LATLON {
             @Override
-            public String getKey() {
-                return FlatGlobe.PROJECTION_LAT_LON;
+            public GeographicProjection getKey() {
+                return new ProjectionEquirectangular();
             }
         },
         SIN {
             @Override
-            public String getKey() {
-                return FlatGlobe.PROJECTION_SINUSOIDAL;
+            public GeographicProjection getKey() {
+                return new ProjectionSinusoidal();
             }
         },
         SIN_MOD {
             @Override
-            public String getKey() {
-                return FlatGlobe.PROJECTION_MODIFIED_SINUSOIDAL;
+            public GeographicProjection getKey() {
+                return new ProjectionModifiedSinusoidal();
+            }
+        },
+        CAUTRA {
+            @Override
+            public GeographicProjection getKey() {
+                return new ProjectionCautra();
+            }
+        },
+        NORTH_POLAR {
+            @Override
+            public GeographicProjection getKey() {
+                return new ProjectionPolarEquidistant();
+            }
+        },
+        SOUTH_POLAR {
+            @Override
+            public GeographicProjection getKey() {
+                return new ProjectionPolarEquidistant(AVKey.SOUTH);
             }
         };
-        abstract public String getKey();
+        abstract public GeographicProjection getKey();
 
         public Projection getNext() {
             return values()[(ordinal() + 1) % values().length];

@@ -32,31 +32,24 @@ import gov.nasa.worldwind.Configuration;
 import gov.nasa.worldwind.avlist.AVKey;
 import gov.nasa.worldwind.avlist.AVList;
 import gov.nasa.worldwind.avlist.AVListImpl;
-import gov.nasa.worldwind.cache.GpuResourceCache;
 import gov.nasa.worldwind.geom.Angle;
 import gov.nasa.worldwind.geom.LatLon;
 import gov.nasa.worldwind.geom.Sector;
 import gov.nasa.worldwind.geom.Vec4;
-import gov.nasa.worldwind.layers.BasicTiledImageLayer;
-import gov.nasa.worldwind.layers.Layer;
 import gov.nasa.worldwind.layers.LayerList;
 import gov.nasa.worldwind.layers.TextureTile;
 import gov.nasa.worldwind.layers.TiledImageLayer;
 import gov.nasa.worldwind.render.DrawContext;
 import gov.nasa.worldwind.util.LevelSet;
 import gov.nasa.worldwind.util.Logging;
-import gov.nasa.worldwind.util.TileKey;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.UUID;
-
-import javax.media.opengl.GLContext;
 
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
@@ -79,7 +72,6 @@ import uk.ac.rdg.resc.edal.wms.util.StyleDef;
 import uk.ac.rdg.resc.logging.RescLogging;
 
 import com.jogamp.opengl.util.texture.TextureData;
-import com.jogamp.opengl.util.texture.TextureIO;
 import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
 
 /**
@@ -87,18 +79,15 @@ import com.jogamp.opengl.util.texture.awt.AWTTextureIO;
  * 
  * @author Guy Griffiths
  */
-public class EdalGridDataLayer implements EdalDataLayer {
+public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer {
+    static int gridLayerNumber = 0;
+
     /** The ID of the layer in the EDAL system */
     final String layerName;
     /** The {@link VideoWallCatalogue} containing the layer */
     private VideoWallCatalogue catalogue;
-    /** The {@link LayerList} to which the {@link EdalGridData} will be added */
-    private LayerList layerList;
-    /** The {@link RescWorldWindow} which will display the layer */
     private RescWorldWindow wwd;
 
-    /** The actual data {@link Layer} */
-    private EdalGridData dataLayer;
     /** The current elevation */
     private Double elevation;
     /** The vertical axis for the data */
@@ -130,11 +119,17 @@ public class EdalGridDataLayer implements EdalDataLayer {
     /** The thread for caching different elevations */
     private ElevationCacher elevationCacheTask = null;
 
-    private int totalPointsX = -1;
-    private int totalPointsY = -1;
-    private boolean latLon = false;
     private CacheListener cacheListener;
     private boolean cachingEnabled = false;
+
+    /** The {@link MapImage} which will be used to generate the images */
+    private MapImage mapImage;
+
+    /**
+     * Cache for generated images TODO Convert to EHCache
+     */
+    private Map<CacheKey, BufferedImage> imageCache = new HashMap<>();
+    private String plotStyleName;
 
     /**
      * Instantiate a new {@link EdalGridDataLayer}
@@ -152,37 +147,19 @@ public class EdalGridDataLayer implements EdalDataLayer {
      *             If the requested layer name is not a gridded layer, or if it
      *             cannot be found in the {@link VideoWallCatalogue}
      */
-    public EdalGridDataLayer(String layerName, VideoWallCatalogue catalogue, LayerList layerList,
-            RescWorldWindow wwd, CacheListener cacheListener) throws EdalException {
+    public EdalGridDataLayer(String layerName, VideoWallCatalogue catalogue,
+            CacheListener cacheListener, RescWorldWindow wwd) throws EdalException {
+        super(makeLevelSet(layerName, catalogue));
         this.layerName = layerName;
         this.catalogue = catalogue;
-        this.layerList = layerList;
-        this.wwd = wwd;
         this.cacheListener = cacheListener;
+        this.wwd = wwd;
 
-        VariableMetadata m = catalogue.getVariableMetadataForLayer(layerName);
-        if (!(m instanceof GridVariableMetadata)) {
-            throw new EdalException("Cannot create a gridded layer from " + layerName
-                    + " as it is not gridded");
-        }
-        metadata = (GridVariableMetadata) m;
-
-        if (GISUtils.isWgs84LonLat(metadata.getHorizontalDomain().getCoordinateReferenceSystem())) {
-            /*
-             * If we have lat-lon native data, we can easily calculate the
-             * required resolution
-             */
-            BoundingBox boundingBox = metadata.getHorizontalDomain().getBoundingBox();
-            double xSpan = boundingBox.getMaxX() - boundingBox.getMinX();
-            double ySpan = boundingBox.getMaxY() - boundingBox.getMinY();
-            double fracX = xSpan / 360;
-            double fracY = ySpan / 180;
-            int xSize = metadata.getHorizontalDomain().getXSize();
-            int ySize = metadata.getHorizontalDomain().getYSize();
-            totalPointsX = (int) (xSize / fracX);
-            totalPointsY = (int) (ySize / fracY);
-            latLon = true;
-        }
+        /*
+         * No need to check that this is the correct type - that has already
+         * been done in makeLevelSet
+         */
+        metadata = (GridVariableMetadata) catalogue.getVariableMetadataForLayer(layerName);
 
         zAxis = metadata.getVerticalDomain();
         tAxis = metadata.getTemporalDomain();
@@ -213,27 +190,44 @@ public class EdalGridDataLayer implements EdalDataLayer {
         overColor = Color.black;
 
         /*
+         * Create a MapImage object for generating the data images.
+         * 
+         * This uses the EDAL system to generate the default style for the given
+         * layer.
+         * 
+         * TODO support other pre-defined layer types.
+         */
+        List<StyleDef> supportedStyles = catalogue.getSupportedStyles(catalogue
+                .getVariableMetadataForLayer(layerName));
+        for (StyleDef style : supportedStyles) {
+            if (style.getStyleName().startsWith("default")) {
+                plotStyleName = style.getStyleName();
+            }
+        }
+        if (plotStyleName == null) {
+            throw new EdalException("No default style defined for this layer");
+        }
+
+        mapImage = GetMapStyleParams.getMapImageFromStyleNameAndParams(catalogue, layerName,
+                plotStyleName, palette, scaleRange, logScale, numColorBands, bgColor, underColor,
+                overColor);
+
+        setName(layerName);
+        setUseTransparentTextures(true);
+        setPickEnabled(true);
+
+        setForceLevelZeroLoads(true);
+        setRetainLevelZeroTiles(false);
+
+        /*
          * Now start caching data in the background. This allows users to change
          * the elevation/time and have a smooth transition
          */
         cacheFromCurrent();
-
-        /*
-         * Now create the layer and add it to the layer list
-         */
-        dataLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale,
-                numColorBands, bgColor, underColor, overColor, latLon, totalPointsX,
-                totalPointsY);
-        layerList.add(dataLayer);
     }
 
     @Override
     public void destroy() {
-        /*
-         * Remove the data layer
-         */
-        layerList.remove(dataLayer);
-
         /*
          * Stop any caching
          */
@@ -294,6 +288,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     public void scaleLimitsChanged(Extent<Float> newScaleRange) {
         this.scaleRange = newScaleRange;
         cacheFromCurrent();
+        mapImageChanged();
         drawLayer();
     }
 
@@ -301,6 +296,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     public void paletteChanged(String newPalette) {
         this.palette = newPalette;
         cacheFromCurrent();
+        mapImageChanged();
         drawLayer();
     }
 
@@ -308,6 +304,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
     public void aboveMaxColourChanged(Color aboveMax) {
         this.overColor = aboveMax;
         cacheFromCurrent();
+        mapImageChanged();
         drawLayer();
     }
 
@@ -315,28 +312,15 @@ public class EdalGridDataLayer implements EdalDataLayer {
     public void belowMinColourChanged(Color belowMin) {
         this.underColor = belowMin;
         cacheFromCurrent();
+        mapImageChanged();
         drawLayer();
     }
 
     @Override
     public void setNumColourBands(int numColourBands) {
         this.numColorBands = numColourBands;
+        mapImageChanged();
         drawLayer();
-    }
-
-    @Override
-    public void setOpacity(double opacity) {
-        if (dataLayer != null) {
-            dataLayer.setOpacity(opacity);
-        }
-    }
-
-    @Override
-    public Double getOpacity() {
-        if (dataLayer != null) {
-            return dataLayer.getOpacity();
-        }
-        return null;
     }
 
     @Override
@@ -349,7 +333,19 @@ public class EdalGridDataLayer implements EdalDataLayer {
         this.logScale = logScaling;
         this.numColorBands = numColourBands;
         cacheFromCurrent();
+        mapImageChanged();
         drawLayer();
+    }
+
+    private void mapImageChanged() {
+        try {
+            mapImage = GetMapStyleParams.getMapImageFromStyleNameAndParams(catalogue, layerName,
+                    plotStyleName, palette, scaleRange, logScale, numColorBands, bgColor,
+                    underColor, overColor);
+        } catch (EdalException e) {
+            String message = RescLogging.getMessage("resc.MapImageProblem");
+            Logging.logger().severe(message);
+        }
     }
 
     @Override
@@ -365,16 +361,11 @@ public class EdalGridDataLayer implements EdalDataLayer {
 
     @Override
     public BufferedImage getLegend(int size, boolean labels) {
-        if (dataLayer != null) {
-            try {
-                return dataLayer.mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0,
-                        150), labels, LEGEND_WIDTH);
-            } catch (EdalException e) {
-                String message = RescLogging.getMessage("resc.DataReadingProblem");
-                Logging.logger().warning(message);
-            }
-        } else {
-            String message = RescLogging.getMessage("resc.NoLayer");
+        try {
+            return mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0, 150), labels,
+                    LEGEND_WIDTH);
+        } catch (EdalException e) {
+            String message = RescLogging.getMessage("resc.DataReadingProblem");
             Logging.logger().warning(message);
         }
         return null;
@@ -385,10 +376,7 @@ public class EdalGridDataLayer implements EdalDataLayer {
      * changed and the layer needs redrawing.
      */
     private void drawLayer() {
-        dataLayer.elevation = elevation;
-        dataLayer.time = time;
-        dataLayer.setExpiryTime(System.currentTimeMillis());
-        dataLayer.firePropertyChange(AVKey.LAYER, null, dataLayer);
+        setExpiryTime(System.currentTimeMillis());
     }
 
     /**
@@ -434,354 +422,271 @@ public class EdalGridDataLayer implements EdalDataLayer {
      *            The time to cache at
      */
     private void cacheEdalGrid(Double elevation, DateTime time) {
-        GpuResourceCache gpuResourceCache = wwd.getGpuResourceCache();
-        EdalGridData cacheLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale,
-                numColorBands, bgColor, underColor, overColor, latLon, totalPointsX, totalPointsY);
-        Map<TileKey, TextureData> cacheData = new HashMap<TileKey, TextureData>();
-        /*
-         * Load the texture data for each tile. This may require actually
-         * generating the images so we do this first, to minimise the time which
-         * we are hogging the GLContext for
-         */
-        for (final TextureTile tile : cacheLayer.getTopLevels()) {
-            /*
-             * We can check if the cache contains a key without needing the
-             * GLContext to be current.
-             */
-            if (!gpuResourceCache.contains(tile.getTileKey())) {
-                cacheLayer.loadTexture(tile);
-                cacheData.put(tile.getTileKey(), tile.getTextureData());
-            }
-        }
-
-        /*
-         * Obtaining and releasing the GLContext takes enough time that checking
-         * whether we need to do so first makes a big difference
-         */
-        if (cacheData.size() > 0) {
-            /*
-             * Now get the GLContext, dump the textures into the cache and
-             * release it.
-             */
-            GLContext context = wwd.getContext();
-            context.makeCurrent();
-            for (Entry<TileKey, TextureData> cacheDatum : cacheData.entrySet()) {
-                gpuResourceCache.put(cacheDatum.getKey(),
-                        TextureIO.newTexture(cacheDatum.getValue()));
-            }
-            context.release();
-        }
+        //                GpuResourceCache gpuResourceCache = wwd.getGpuResourceCache();
+        //        EdalGridData cacheLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale,
+        //                numColorBands, bgColor, underColor, overColor, latLon, totalPointsX, totalPointsY);
+        //        Map<TileKey, TextureData> cacheData = new HashMap<TileKey, TextureData>();
+        //        /*
+        //         * Load the texture data for each tile. This may require actually
+        //         * generating the images so we do this first, to minimise the time which
+        //         * we are hogging the GLContext for
+        //         */
+        //        for (final TextureTile tile : cacheLayer.getTopLevels()) {
+        //            /*
+        //             * We can check if the cache contains a key without needing the
+        //             * GLContext to be current.
+        //             */
+        //            if (!gpuResourceCache.contains(tile.getTileKey())) {
+        //                cacheLayer.loadTexture(tile);
+        //                cacheData.put(tile.getTileKey(), tile.getTextureData());
+        //            }
+        //        }
+        //
+        //        /*
+        //         * Obtaining and releasing the GLContext takes enough time that checking
+        //         * whether we need to do so first makes a big difference
+        //         */
+        //        if (cacheData.size() > 0) {
+        //            /*
+        //             * Now get the GLContext, dump the textures into the cache and
+        //             * release it.
+        //             */
+        //            GLContext context = wwd.getContext();
+        //            context.makeCurrent();
+        //            for (Entry<TileKey, TextureData> cacheDatum : cacheData.entrySet()) {
+        //                gpuResourceCache.put(cacheDatum.getKey(),
+        //                        TextureIO.newTexture(cacheDatum.getValue()));
+        //            }
+        //            context.release();
+        //        }
     }
 
     /**
-     * A {@link TiledImageLayer} which creates tiles on-the-fly when they are
-     * required.
-     * 
-     * This has its own copy of elevation and time. It is a nested class, and
-     * could use the values from the parent {@link EdalGridDataLayer}, but this
-     * would not allow us to use {@link EdalGridData} to precache layers.
-     * 
-     * Much of this code is adapted from {@link BasicTiledImageLayer}
-     * 
-     * @author Guy Griffiths
-     */
-    public class EdalGridData extends TiledImageLayer {
-        /** The {@link MapImage} which will be used to generate the images */
-        private MapImage mapImage;
-        private Double elevation;
-        private DateTime time;
-
-        public EdalGridData(Double elevation, DateTime time, String palette,
-                Extent<Float> scaleRange, boolean logScale, int numColorBands, Color bgColor,
-                Color underColor, Color overColor, boolean latLon, int totalX, int totalY) {
-            super(makeLevelSet(layerName, elevation, time, palette, scaleRange, logScale,
-                    numColorBands, bgColor, underColor, overColor, latLon, totalX, totalY));
-            this.elevation = elevation;
-            this.time = time;
-
-            try {
-                /*
-                 * Create a MapImage object for generating the data images.
-                 * 
-                 * This uses the EDAL system to generate the default style for
-                 * the given layer.
-                 * 
-                 * TODO support other pre-defined layer types.
-                 */
-                List<StyleDef> supportedStyles = catalogue.getSupportedStyles(catalogue
-                        .getVariableMetadataForLayer(layerName));
-                String plotStyleName = null;
-                for (StyleDef style : supportedStyles) {
-                    if (style.getStyleName().startsWith("default")) {
-                        plotStyleName = style.getStyleName();
-                    }
-                }
-                if (plotStyleName == null) {
-                    throw new EdalException("No default style defined for this layer");
-                }
-                mapImage = GetMapStyleParams.getMapImageFromStyleNameAndParams(catalogue,
-                        layerName, plotStyleName, palette, scaleRange, logScale, numColorBands,
-                        bgColor, underColor, overColor);
-            } catch (EdalException e) {
-                e.printStackTrace();
-                /*
-                 * TODO log better
-                 */
-            }
-
-            setName(layerName);
-            setUseTransparentTextures(true);
-            setPickEnabled(true);
-
-            setForceLevelZeroLoads(true);
-            setRetainLevelZeroTiles(true);
-
-            String layerId = getKey();
-            getLevels().setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
-            getLevels().setValue(AVKey.DATASET_NAME, layerId);
-        }
-
-        private String getKey() {
-            String layerId = layerName + ":" + elevation + ":" + time + ":" + palette + ":"
-                    + scaleRange.toString() + ":" + logScale + ":" + numColorBands + ":" + bgColor
-                    + ":" + underColor + underColor.getAlpha() + ":" + overColor
-                    + overColor.getAlpha();
-            return UUID.nameUUIDFromBytes(layerId.getBytes()).toString();
-        }
-
-        Map<PlottingDomainParams, BufferedImage> imageCache = new HashMap<>();
-
-        /**
-         * Generates the image for a given {@link TextureTile}
-         * 
-         * @param tile
-         *            The {@link TextureTile} specifying location, size, etc.
-         * @return A {@link BufferedImage} representing the data at the given
-         *         location
-         */
-        protected BufferedImage createTileImage(TextureTile tile) {
-            if (mapImage == null) {
-                return missingImage(tile);
-            }
-
-            int width = tile.getLevel().getTileWidth();
-            int height = tile.getLevel().getTileHeight();
-            Sector s = tile.getSector();
-            BoundingBox bbox = new BoundingBoxImpl(s.getMinLongitude().degrees,
-                    s.getMinLatitude().degrees, s.getMaxLongitude().degrees,
-                    s.getMaxLatitude().degrees, DefaultGeographicCRS.WGS84);
-
-            PlottingDomainParams params = new PlottingDomainParams(width, height, bbox, null, null,
-                    null, elevation, time);
-            try {
-                
-                if (imageCache.containsKey(params)) {
-                    return imageCache.get(params);
-                } else {
-                    BufferedImage image = mapImage.drawImage(params, catalogue);
-                    imageCache.put(params, image);
-                    return image;
-                }
-            } catch (EdalException e) {
-                /*
-                 * Problem generating an image. Log and return a standard image
-                 */
-                e.printStackTrace();
-                return missingImage(tile);
-            }
-        }
-
-        protected void loadTexture(final TextureTile tile) {
-            TextureData textureData;
-
-            BufferedImage tileImage = createTileImage(tile);
-
-            textureData = AWTTextureIO.newTextureData(Configuration.getMaxCompatibleGLProfile(),
-                    tileImage, isUseMipMaps());
-
-            if (textureData == null) {
-                /*
-                 * Log error
-                 */
-                String message = RescLogging.getMessage("resc.DataReadingProblem");
-                Logging.logger().warning(message);
-            }
-
-            tile.setTextureData(textureData);
-            if (tile.getLevelNumber() != 0) {
-                /*
-                 * The level 0 cache is never used.
-                 */
-                TextureTile.getMemoryCache().add(tile.getTileKey(), tile);
-            }
-        }
-
-        @Override
-        protected void forceTextureLoad(TextureTile tile) {
-            /*
-             * Do not force texture loading. This makes things slow, and
-             * removing it has no noticeable negative effects.
-             */
-        }
-
-        @Override
-        protected void requestTexture(DrawContext dc, TextureTile tile) {
-            /*
-             * Set the priority of the tile and add a request thread to the
-             * queue
-             */
-            Vec4 centroid = tile.getCentroidPoint(dc.getGlobe());
-            Vec4 referencePoint = this.getReferencePoint(dc);
-            if (referencePoint != null)
-                tile.setPriority(centroid.distanceTo3(referencePoint));
-
-            RequestTask task = new RequestTask(tile, this);
-            this.getRequestQ().add(task);
-        }
-
-        protected RequestTask createRequestTask(TextureTile tile) {
-            return new RequestTask(tile, this);
-        }
-
-        protected class RequestTask implements Runnable, Comparable<RequestTask> {
-            protected final EdalGridData layer;
-            protected final TextureTile tile;
-
-            protected RequestTask(TextureTile tile, EdalGridData layer) {
-                this.layer = layer;
-                this.tile = tile;
-            }
-
-            @Override
-            public void run() {
-                if (Thread.currentThread().isInterrupted()) {
-                    /*
-                     * The task was cancelled because it's a duplicate or for
-                     * some other reason
-                     */
-                    return;
-                }
-
-                layer.loadTexture(tile);
-                /*
-                 * This means that each tile gets displayed as it is loaded. The
-                 * GPU texture caching might mean that this is unnecessary, but
-                 * it doesn't slow things down noticeably keeping it in.
-                 */
-                //                wwd.redraw();
-            }
-
-            /*
-             * All of the following taken from BasicTiledImageLayer - sorts out
-             * tile priorities
-             */
-
-            /**
-             * @param that
-             *            the task to compare
-             * 
-             * @return -1 if <code>this</code> less than <code>that</code>, 1 if
-             *         greater than, 0 if equal
-             * 
-             * @throws IllegalArgumentException
-             *             if <code>that</code> is null
-             */
-            @Override
-            public int compareTo(RequestTask that) {
-                if (that == null) {
-                    String msg = Logging.getMessage("nullValue.RequestTaskIsNull");
-                    Logging.logger().severe(msg);
-                    throw new IllegalArgumentException(msg);
-                }
-                return this.tile.getPriority() == that.tile.getPriority() ? 0 : this.tile
-                        .getPriority() < that.tile.getPriority() ? -1 : 1;
-            }
-
-            @Override
-            public boolean equals(Object o) {
-                if (this == o)
-                    return true;
-                if (o == null || getClass() != o.getClass())
-                    return false;
-
-                final RequestTask that = (RequestTask) o;
-
-                /*
-                 * Don't include layer in comparison so that requests are shared
-                 * among layers
-                 */
-                return !(tile != null ? !tile.equals(that.tile) : that.tile != null);
-            }
-
-            @Override
-            public int hashCode() {
-                return (tile != null ? tile.hashCode() : 0);
-            }
-
-            @Override
-            public String toString() {
-                return this.tile.toString();
-            }
-        }
-    }
-
-    /**
-     * Creates a red cross on a white background for cases where the image
-     * cannot be generated
+     * Generates the image for a given {@link TextureTile}
      * 
      * @param tile
-     *            The {@link TextureTile} which is to be generated
-     * @return A replacement image
+     *            The {@link TextureTile} specifying location, size, etc.
+     * @return A {@link BufferedImage} representing the data at the given
+     *         location
      */
-    private static BufferedImage missingImage(TextureTile tile) {
+    protected BufferedImage createTileImage(TextureTile tile) {
+        if (mapImage == null) {
+            return missingImage(tile);
+        }
+
         int width = tile.getLevel().getTileWidth();
         int height = tile.getLevel().getTileHeight();
-        BufferedImage image = new BufferedImage(tile.getLevel().getTileWidth(), tile.getLevel()
-                .getTileHeight(), BufferedImage.TYPE_4BYTE_ABGR);
-        // Draw a red cross on white background
-        Graphics2D g2 = image.createGraphics();
-        g2.setPaint(Color.WHITE);
-        g2.fillRect(0, 0, width, height);
-        g2.setPaint(Color.RED);
-        g2.drawLine(0, 0, width, height);
-        g2.drawLine(0, height, width, 0);
-        return image;
+        Sector s = tile.getSector();
+        BoundingBox bbox = new BoundingBoxImpl(s.getMinLongitude().degrees,
+                s.getMinLatitude().degrees, s.getMaxLongitude().degrees,
+                s.getMaxLatitude().degrees, DefaultGeographicCRS.WGS84);
+
+        PlottingDomainParams params = new PlottingDomainParams(width, height, bbox, null, null,
+                null, elevation, time);
+
+        CacheKey key = new CacheKey(params, scaleRange, palette, underColor, overColor, logScale,
+                numColorBands);
+        try {
+
+            if (imageCache.containsKey(key)) {
+                return imageCache.get(key);
+            } else {
+                BufferedImage image = mapImage.drawImage(params, catalogue);
+                imageCache.put(key, image);
+                return image;
+            }
+        } catch (EdalException e) {
+            /*
+             * Problem generating an image. Log and return a standard image
+             */
+            e.printStackTrace();
+            return missingImage(tile);
+        }
     }
 
-    private static LevelSet makeLevelSet(String layerName, Double elevation, DateTime time,
-            String palette, Extent<Float> scaleRange, boolean logScale, int numColorBands,
-            Color bgColor, Color underColor, Color overColor, boolean latLon, int totalX, int totalY) {
+    protected void loadTexture(final TextureTile tile) {
+        TextureData textureData;
+
+        BufferedImage tileImage = createTileImage(tile);
+
+        textureData = AWTTextureIO.newTextureData(Configuration.getMaxCompatibleGLProfile(),
+                tileImage, isUseMipMaps());
+
+        if (textureData == null) {
+            /*
+             * Log error
+             */
+            String message = RescLogging.getMessage("resc.DataReadingProblem");
+            Logging.logger().warning(message);
+        }
+
+        tile.setTextureData(textureData);
+        if (tile.getLevelNumber() != 0) {
+            /*
+             * The level 0 cache is never used.
+             */
+            TextureTile.getMemoryCache().add(tile.getTileKey(), tile);
+        }
+    }
+
+    @Override
+    protected void forceTextureLoad(TextureTile tile) {
         /*
-         * Create a unique ID for the layer based on all adjustable settings.
-         * This is for caching purposes.
+         * Do not force texture loading. This makes things slow, and removing it
+         * has no noticeable negative effects.
+         */
+        this.loadTexture(tile);
+    }
+
+    @Override
+    protected void requestTexture(DrawContext dc, TextureTile tile) {
+        Vec4 centroid = tile.getCentroidPoint(dc.getGlobe());
+        Vec4 referencePoint = this.getReferencePoint(dc);
+        if (referencePoint != null)
+            tile.setPriority(centroid.distanceTo3(referencePoint));
+
+        RequestTask task = new RequestTask(tile, this);
+        this.getRequestQ().add(task);
+    }
+
+    protected class RequestTask implements Runnable, Comparable<RequestTask> {
+        protected final EdalGridDataLayer layer;
+        protected final TextureTile tile;
+
+        protected RequestTask(TextureTile tile, EdalGridDataLayer layer) {
+            this.layer = layer;
+            this.tile = tile;
+        }
+
+        @Override
+        public void run() {
+            if (Thread.currentThread().isInterrupted()) {
+                /*
+                 * The task was cancelled because it's a duplicate or for some
+                 * other reason
+                 */
+                return;
+            }
+
+            layer.loadTexture(tile);
+            /*
+             * This means that each tile gets displayed as it is loaded.
+             * Probably unnecessary.
+             */
+            wwd.redraw();
+        }
+
+        /*
+         * All of the following taken from BasicTiledImageLayer - sorts out tile
+         * priorities
          */
 
-        AVList params = new AVListImpl();
-
-        String layerId = layerName + "-initial";
-        params.setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerId);
-        params.setValue(AVKey.DATASET_NAME, layerId);
-
-        params.setValue(AVKey.SERVICE, "*");
-        params.setValue(AVKey.FORMAT_SUFFIX, ".png");
-        params.setValue(AVKey.NUM_EMPTY_LEVELS, 0);
-
-        if (latLon) {
-            params.setValue(AVKey.NUM_LEVELS, 1);
-            params.setValue(AVKey.TILE_WIDTH, totalX);
-            params.setValue(AVKey.TILE_HEIGHT, totalY);
-            params.setValue(AVKey.LEVEL_ZERO_TILE_DELTA,
-                    new LatLon(Angle.fromDegrees(180d), Angle.fromDegrees(360d)));
-        } else {
-            params.setValue(AVKey.NUM_LEVELS, 5);
-            params.setValue(AVKey.TILE_WIDTH, 256);
-            params.setValue(AVKey.TILE_HEIGHT, 256);
-            params.setValue(AVKey.LEVEL_ZERO_TILE_DELTA,
-                    new LatLon(Angle.fromDegrees(60d), Angle.fromDegrees(60d)));
+        /**
+         * @param that
+         *            the task to compare
+         * 
+         * @return -1 if <code>this</code> less than <code>that</code>, 1 if
+         *         greater than, 0 if equal
+         * 
+         * @throws IllegalArgumentException
+         *             if <code>that</code> is null
+         */
+        @Override
+        public int compareTo(RequestTask that) {
+            if (that == null) {
+                String msg = Logging.getMessage("nullValue.RequestTaskIsNull");
+                Logging.logger().severe(msg);
+                throw new IllegalArgumentException(msg);
+            }
+            return this.tile.getPriority() == that.tile.getPriority() ? 0
+                    : this.tile.getPriority() < that.tile.getPriority() ? -1 : 1;
         }
-        params.setValue(AVKey.SECTOR, Sector.FULL_SPHERE);
 
-        return new LevelSet(params);
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
+
+            final RequestTask that = (RequestTask) o;
+
+            /*
+             * Don't include layer in comparison so that requests are shared
+             * among layers
+             */
+            return !(tile != null ? !tile.equals(that.tile) : that.tile != null);
+        }
+
+        @Override
+        public int hashCode() {
+            return (tile != null ? tile.hashCode() : 0);
+        }
+
+        @Override
+        public String toString() {
+            return this.tile.toString();
+        }
+    }
+
+    /**
+     * Overrides the parent method, populating the top level with
+     * {@link RescTextureTile}s instead of normal {@link TextureTile}s.
+     * 
+     * The only difference between the 2 is that {@link RescTextureTile}s have
+     * an update time based on when their texture data was set, rather than when
+     * they were bound to a draw context. If normal {@link TextureTile}s are
+     * used, then they falsely test as not having expired when they actually
+     * have.
+     * 
+     * I'm not sure of exactly why this is the case, but this behaviour can be
+     * seen by:
+     * 
+     * <li>Commenting out this method</li>
+     * 
+     * <li>Running the software and selecting a layer</li>
+     * 
+     * <li>Zooming in a lot</li>
+     * 
+     * <li>Changing the colour palette</li>
+     * 
+     * <li>Zooming out</li>
+     * 
+     * After which several tiles are not refreshed, but use the old colour
+     * palette. Try the same again with this method in and it works as expected
+     * (although you may need to move the mouse about to trigger a redraw)
+     */
+    protected void createTopLevelTiles() {
+        super.createTopLevelTiles();
+        ArrayList<TextureTile> rescTiles = new ArrayList<>();
+        for (TextureTile tile : topLevels) {
+            rescTiles.add(new RescTextureTile(tile.getSector(), tile.getLevel(), tile.getRow(),
+                    tile.getColumn()));
+        }
+        topLevels = rescTiles;
+    }
+
+    @SuppressWarnings("unused")
+    private class CacheKey {
+        private PlottingDomainParams params;
+        private Extent<Float> scaleRange;
+        private String palette;
+        private Color belowMin;
+        private Color aboveMax;
+        private boolean logScaling;
+        private int numColourBands;
+
+        public CacheKey(PlottingDomainParams params, Extent<Float> scaleRange, String palette,
+                Color belowMin, Color aboveMax, boolean logScaling, int numColourBands) {
+            super();
+            this.params = params;
+            this.scaleRange = scaleRange;
+            this.palette = palette;
+            this.belowMin = belowMin;
+            this.aboveMax = aboveMax;
+            this.logScaling = logScaling;
+            this.numColourBands = numColourBands;
+        }
     }
 
     /**
@@ -923,5 +828,91 @@ public class EdalGridDataLayer implements EdalDataLayer {
          * Called when time caching is complete
          */
         public void timeCachingComplete();
+    }
+
+    /**
+     * Creates a red cross on a white background for cases where the image
+     * cannot be generated
+     * 
+     * @param tile
+     *            The {@link TextureTile} which is to be generated
+     * @return A replacement image
+     */
+    private static BufferedImage missingImage(TextureTile tile) {
+        int width = tile.getLevel().getTileWidth();
+        int height = tile.getLevel().getTileHeight();
+        BufferedImage image = new BufferedImage(tile.getLevel().getTileWidth(), tile.getLevel()
+                .getTileHeight(), BufferedImage.TYPE_4BYTE_ABGR);
+        // Draw a red cross on white background
+        Graphics2D g2 = image.createGraphics();
+        g2.setPaint(Color.WHITE);
+        g2.fillRect(0, 0, width, height);
+        g2.setPaint(Color.RED);
+        g2.drawLine(0, 0, width, height);
+        g2.drawLine(0, height, width, 0);
+        return image;
+    }
+
+    private static LevelSet makeLevelSet(String layerName, VideoWallCatalogue catalogue)
+            throws EdalException {
+        VariableMetadata m = catalogue.getVariableMetadataForLayer(layerName);
+        if (!(m instanceof GridVariableMetadata)) {
+            throw new EdalException("Cannot create a gridded layer from " + layerName
+                    + " as it is not gridded");
+        }
+        GridVariableMetadata metadata = (GridVariableMetadata) m;
+        AVList params = new AVListImpl();
+        params.setValue(AVKey.DATA_CACHE_NAME, "EDAL/Tiles/" + layerName + (gridLayerNumber++));
+        params.setValue(AVKey.DATASET_NAME, layerName);
+
+        if (GISUtils.isWgs84LonLat(metadata.getHorizontalDomain().getCoordinateReferenceSystem())) {
+            /*
+             * If we have lat-lon native data, we can easily calculate the
+             * required resolution
+             */
+            BoundingBox boundingBox = metadata.getHorizontalDomain().getBoundingBox();
+            double xSpan = boundingBox.getMaxX() - boundingBox.getMinX();
+            double ySpan = boundingBox.getMaxY() - boundingBox.getMinY();
+            double fracX = xSpan / 360;
+            double fracY = ySpan / 180;
+            int xSize = metadata.getHorizontalDomain().getXSize();
+            int ySize = metadata.getHorizontalDomain().getYSize();
+            int totalPointsX = (int) (xSize / fracX);
+            int totalPointsY = (int) (ySize / fracY);
+
+            int biggest = totalPointsX > totalPointsY ? totalPointsX : totalPointsY;
+            if (biggest < 256) {
+                /*
+                 * For total grids < 256x256 pixels we want one level with the
+                 * correct number of points
+                 */
+                params.setValue(AVKey.NUM_LEVELS, 1);
+                params.setValue(AVKey.TILE_WIDTH, totalPointsX);
+                params.setValue(AVKey.TILE_HEIGHT, totalPointsY);
+            } else {
+                /*
+                 * Otherwise we want to tile it in 256x256 tiles
+                 */
+                int nLevels = 2 + (int) (Math.log(biggest / 256) / Math.log(2));
+                params.setValue(AVKey.NUM_LEVELS, nLevels);
+                params.setValue(AVKey.TILE_WIDTH, 256);
+                params.setValue(AVKey.TILE_HEIGHT, 256);
+            }
+            params.setValue(AVKey.LEVEL_ZERO_TILE_DELTA,
+                    new LatLon(Angle.fromDegrees(180d), Angle.fromDegrees(360d)));
+        } else {
+            params.setValue(AVKey.NUM_LEVELS, 10);
+            params.setValue(AVKey.TILE_WIDTH, 256);
+            params.setValue(AVKey.TILE_HEIGHT, 256);
+            params.setValue(AVKey.LEVEL_ZERO_TILE_DELTA,
+                    new LatLon(Angle.fromDegrees(60d), Angle.fromDegrees(60d)));
+        }
+
+        params.setValue(AVKey.SERVICE, "*");
+        params.setValue(AVKey.FORMAT_SUFFIX, ".png");
+        params.setValue(AVKey.NUM_EMPTY_LEVELS, 0);
+        params.setValue(AVKey.SECTOR, Sector.FULL_SPHERE);
+
+        return new LevelSet(params);
     }
 }

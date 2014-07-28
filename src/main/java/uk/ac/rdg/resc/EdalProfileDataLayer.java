@@ -51,7 +51,6 @@ import java.util.concurrent.Executors;
 
 import org.joda.time.DateTime;
 
-import uk.ac.rdg.resc.EdalGridDataLayer.EdalGridData;
 import uk.ac.rdg.resc.edal.dataset.Dataset;
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.domain.TemporalDomain;
@@ -266,11 +265,11 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     }
 
     @Override
-    public Double getOpacity() {
+    public double getOpacity() {
         if (dataLayer != null) {
             return dataLayer.getOpacity();
         }
-        return null;
+        return 1.0;
     }
 
     @Override

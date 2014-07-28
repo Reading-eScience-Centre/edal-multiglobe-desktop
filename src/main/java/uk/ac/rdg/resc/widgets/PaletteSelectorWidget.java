@@ -762,7 +762,7 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
         /**
          * @return The overall opacity of the layer, from 0 to 1
          */
-        public Double getOpacity();
+        public double getOpacity();
 
         /**
          * Changes multiple parameters at once
