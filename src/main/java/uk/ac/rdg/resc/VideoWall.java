@@ -54,6 +54,14 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.xml.bind.JAXBException;
 
+import net.sf.ehcache.Cache;
+import net.sf.ehcache.CacheManager;
+import net.sf.ehcache.config.CacheConfiguration;
+import net.sf.ehcache.config.CacheConfiguration.TransactionalMode;
+import net.sf.ehcache.config.MemoryUnit;
+import net.sf.ehcache.config.PersistenceConfiguration;
+import net.sf.ehcache.config.PersistenceConfiguration.Strategy;
+import net.sf.ehcache.store.MemoryStoreEvictionPolicy;
 import uk.ac.rdg.resc.edal.dataset.DatasetFactory;
 import uk.ac.rdg.resc.edal.dataset.cdm.CdmGridDatasetFactory;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
@@ -66,6 +74,8 @@ import uk.ac.rdg.resc.logging.RescLogging;
  */
 @SuppressWarnings("serial")
 public class VideoWall extends JFrame {
+    static final String CACHE_NAME = "imageCache";
+
     private static final int BUTTON_WIDTH = 50;
     ExecutorService threadPool;
 
@@ -85,7 +95,7 @@ public class VideoWall extends JFrame {
         return instance;
     }
 
-    public VideoWall() throws IOException, EdalException, JAXBException {
+    private VideoWall() throws IOException, EdalException, JAXBException {
         init();
     }
 
@@ -231,6 +241,21 @@ public class VideoWall extends JFrame {
          * Set the config location
          */
         System.setProperty("gov.nasa.worldwind.config.document", "config/resc_worldwind.xml");
+
+        /*
+         * Configure shared cache
+         */
+        final int cacheSizeMB = Configuration.getIntegerValue(
+                "uk.ac.rdg.resc.edal.multiglobe.CacheSize", 64);
+        CacheManager singletonManager = CacheManager.create();
+        CacheConfiguration config = new CacheConfiguration(CACHE_NAME, 0).eternal(true)
+                .maxBytesLocalHeap(cacheSizeMB, MemoryUnit.MEGABYTES)
+                .memoryStoreEvictionPolicy(MemoryStoreEvictionPolicy.LFU)
+                .persistence(new PersistenceConfiguration().strategy(Strategy.NONE))
+                .transactionalMode(TransactionalMode.OFF);
+        Cache memoryCache = new Cache(config);
+        singletonManager.addCache(memoryCache);
+
         try {
             /*
              * This code sets the X Windows property WM_CLASS to

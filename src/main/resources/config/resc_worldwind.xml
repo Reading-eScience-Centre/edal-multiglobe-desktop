@@ -15,10 +15,8 @@
     <!-- This is required for the multiglobe software to work. -->
     <!-- Changing or removing it has no effect -->
     <Property name="gov.nasa.worldwind.avkey.ViewClassName" value="uk.ac.rdg.resc.LinkedView"/>
-    <!-- This is a 2G in-memory cache -->
-    <Property name="gov.nasa.worldwind.avkey.TextureTileCacheSize" value="2000000000"/>
-    <!-- This is a 2G cache -->
-    <Property name="gov.nasa.worldwind.avkey.TextureCacheSize" value="2000000000"/>
+    <!-- The size of the image cache to use, in MB (default 64MB) -->
+    <Property name="uk.ac.rdg.resc.edal.multiglobe.CacheSize" value="1024"/>
                   
     <LayerList href="config/resc_layers.xml"/>
     <!--Most configuration information is defined in attribute-value pairs-->

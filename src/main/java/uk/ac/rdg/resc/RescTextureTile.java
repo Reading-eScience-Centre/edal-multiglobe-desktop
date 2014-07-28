@@ -68,6 +68,11 @@ public class RescTextureTile extends TextureTile {
 
     @Override
     public boolean isTextureExpired(long expiryTime) {
-        return this.textureDataUpdateTime > 0 && this.textureDataUpdateTime < expiryTime;
+        /*
+         * The original TextureTile checked if the update time was > 0. This
+         * causes issues with textures not being replaced (perhaps a new
+         * TextureTile is sometimes created with the same cache key?)
+         */
+        return this.textureDataUpdateTime <= expiryTime;
     }
 }

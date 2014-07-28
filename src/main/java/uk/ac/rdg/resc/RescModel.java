@@ -297,7 +297,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
              */
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
                 try {
-                    tempLayer = new EdalGridDataLayer(layerName, catalogue, this, wwd);
+                    tempLayer = new EdalGridDataLayer(layerName, catalogue, this);
                     /*
                      * TODO make EdalDataLayer implement Layer and remove the cast.
                      */

@@ -46,10 +46,13 @@ import gov.nasa.worldwind.util.Logging;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
+import net.sf.ehcache.Cache;
+import net.sf.ehcache.CacheManager;
+import net.sf.ehcache.Element;
 
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
@@ -86,7 +89,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     final String layerName;
     /** The {@link VideoWallCatalogue} containing the layer */
     private VideoWallCatalogue catalogue;
-    private RescWorldWindow wwd;
 
     /** The current elevation */
     private Double elevation;
@@ -114,22 +116,22 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     /** The current colour for data above the maximum */
     private Color overColor;
 
+    /** The {@link MapImage} which will be used to generate the images */
+    private MapImage mapImage;
+
+    /**
+     * Cache for generated images
+     */
+    private Cache imageCache;
+    private String plotStyleName;
+
     /** The thread for caching different times */
     private TimeCacher timeCacheTask = null;
     /** The thread for caching different elevations */
     private ElevationCacher elevationCacheTask = null;
 
     private CacheListener cacheListener;
-    private boolean cachingEnabled = false;
-
-    /** The {@link MapImage} which will be used to generate the images */
-    private MapImage mapImage;
-
-    /**
-     * Cache for generated images TODO Convert to EHCache
-     */
-    private Map<CacheKey, BufferedImage> imageCache = new HashMap<>();
-    private String plotStyleName;
+    private boolean gpuCachingEnabled = false;
 
     /**
      * Instantiate a new {@link EdalGridDataLayer}
@@ -148,12 +150,15 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
      *             cannot be found in the {@link VideoWallCatalogue}
      */
     public EdalGridDataLayer(String layerName, VideoWallCatalogue catalogue,
-            CacheListener cacheListener, RescWorldWindow wwd) throws EdalException {
+            CacheListener cacheListener) throws EdalException {
         super(makeLevelSet(layerName, catalogue));
+
+        CacheManager manager = CacheManager.create();
+        imageCache = manager.getCache(VideoWall.CACHE_NAME);
+
         this.layerName = layerName;
         this.catalogue = catalogue;
         this.cacheListener = cacheListener;
-        this.wwd = wwd;
 
         /*
          * No need to check that this is the correct type - that has already
@@ -208,9 +213,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             throw new EdalException("No default style defined for this layer");
         }
 
-        mapImage = GetMapStyleParams.getMapImageFromStyleNameAndParams(catalogue, layerName,
-                plotStyleName, palette, scaleRange, logScale, numColorBands, bgColor, underColor,
-                overColor);
+        mapImageChanged();
 
         setName(layerName);
         setUseTransparentTextures(true);
@@ -391,7 +394,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
      * will not be recomputed, so this method should be quick to run.
      */
     public void cacheFromCurrent() {
-        if (!cachingEnabled) {
+        if (!gpuCachingEnabled) {
             return;
         } else {
             if (timeCacheTask != null) {
@@ -486,22 +489,26 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
 
         CacheKey key = new CacheKey(params, scaleRange, palette, underColor, overColor, logScale,
                 numColorBands);
-        try {
 
-            if (imageCache.containsKey(key)) {
-                return imageCache.get(key);
-            } else {
-                BufferedImage image = mapImage.drawImage(params, catalogue);
-                imageCache.put(key, image);
-                return image;
+        BufferedImage image;
+        Element element = imageCache.get(key);
+        if (element != null && element.getObjectValue() != null) {
+            image = (BufferedImage) element.getObjectValue();
+        } else {
+            try {
+                image = mapImage.drawImage(params, catalogue);
+                imageCache.put(new Element(key, image));
+            } catch (EdalException e) {
+                /*
+                 * Problem generating an image. Log and return a standard image
+                 */
+                String message = RescLogging.getMessage("resc.DataReadingProblem");
+                Logging.logger().warning(message);
+                return missingImage(tile);
             }
-        } catch (EdalException e) {
-            /*
-             * Problem generating an image. Log and return a standard image
-             */
-            e.printStackTrace();
-            return missingImage(tile);
         }
+
+        return image;
     }
 
     protected void loadTexture(final TextureTile tile) {
@@ -531,10 +538,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
 
     @Override
     protected void forceTextureLoad(TextureTile tile) {
-        /*
-         * Do not force texture loading. This makes things slow, and removing it
-         * has no noticeable negative effects.
-         */
         this.loadTexture(tile);
     }
 
@@ -571,9 +574,10 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             layer.loadTexture(tile);
             /*
              * This means that each tile gets displayed as it is loaded.
-             * Probably unnecessary.
+             * 
+             * Without this we need to wait for a mouse movement...
              */
-            wwd.redraw();
+            firePropertyChange(AVKey.LAYER, null, layer);
         }
 
         /*
@@ -666,8 +670,18 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
         topLevels = rescTiles;
     }
 
-    @SuppressWarnings("unused")
-    private class CacheKey {
+    @SuppressWarnings({ "serial" })
+    /**
+     * Class to be used as a key for the image cache. Combines
+     * {@link PlottingDomainParams} with all of the scale parameters.
+     * 
+     * The ideal would be to use {@link MapImage} in place of all of the scale
+     * parameters since this is more precise, but at the time of writing
+     * {@link MapImage} doesn't necessarily implement hashCode and equals
+     *
+     * @author Guy Griffiths
+     */
+    private static class CacheKey implements Serializable {
         private PlottingDomainParams params;
         private Extent<Float> scaleRange;
         private String palette;
@@ -678,7 +692,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
 
         public CacheKey(PlottingDomainParams params, Extent<Float> scaleRange, String palette,
                 Color belowMin, Color aboveMax, boolean logScaling, int numColourBands) {
-            super();
             this.params = params;
             this.scaleRange = scaleRange;
             this.palette = palette;
@@ -686,6 +699,61 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             this.aboveMax = aboveMax;
             this.logScaling = logScaling;
             this.numColourBands = numColourBands;
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((aboveMax == null) ? 0 : aboveMax.hashCode());
+            result = prime * result + ((belowMin == null) ? 0 : belowMin.hashCode());
+            result = prime * result + (logScaling ? 1231 : 1237);
+            result = prime * result + numColourBands;
+            result = prime * result + ((palette == null) ? 0 : palette.hashCode());
+            result = prime * result + ((params == null) ? 0 : params.hashCode());
+            result = prime * result + ((scaleRange == null) ? 0 : scaleRange.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            CacheKey other = (CacheKey) obj;
+            if (aboveMax == null) {
+                if (other.aboveMax != null)
+                    return false;
+            } else if (!aboveMax.equals(other.aboveMax))
+                return false;
+            if (belowMin == null) {
+                if (other.belowMin != null)
+                    return false;
+            } else if (!belowMin.equals(other.belowMin))
+                return false;
+            if (logScaling != other.logScaling)
+                return false;
+            if (numColourBands != other.numColourBands)
+                return false;
+            if (palette == null) {
+                if (other.palette != null)
+                    return false;
+            } else if (!palette.equals(other.palette))
+                return false;
+            if (params == null) {
+                if (other.params != null)
+                    return false;
+            } else if (!params.equals(other.params))
+                return false;
+            if (scaleRange == null) {
+                if (other.scaleRange != null)
+                    return false;
+            } else if (!scaleRange.equals(other.scaleRange))
+                return false;
+            return true;
         }
     }
 
