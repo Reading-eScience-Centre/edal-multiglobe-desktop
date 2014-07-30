@@ -299,7 +299,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                 try {
                     tempLayer = new EdalGridDataLayer(layerName, catalogue, this);
                     /*
-                     * TODO make EdalDataLayer implement Layer and remove the cast.
+                     * TODO make EdalDataLayer implement Layer and remove the
+                     * cast.
                      */
                     getLayers().add((Layer) tempLayer);
                 } catch (EdalException e) {
@@ -333,7 +334,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                  * from the layer list
                  */
                 edalDataLayer.destroy();
-                if(edalDataLayer instanceof EdalGridDataLayer) {
+                if (edalDataLayer instanceof EdalGridDataLayer) {
                     EdalGridDataLayer edalGridDataLayer = (EdalGridDataLayer) edalDataLayer;
                     getLayers().remove(edalGridDataLayer);
                 }
@@ -825,13 +826,12 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
              * Therefore we only actually set the time on a profile layer once
              * the slider has stopped moving (see sliderSettled method)
              */
-            if (edalDataLayer instanceof EdalGridDataLayer) {
-                if (edalDataLayer != null) {
-                    DateTime time = new DateTime((long) value);
-                    Extent<DateTime> range = Extents.newExtent(new DateTime(valueRange.getLow()
-                            .longValue()), new DateTime(valueRange.getHigh().longValue()));
-                    edalDataLayer.setTime(time, range);
-                }
+            if (edalDataLayer != null && edalDataLayer instanceof EdalGridDataLayer) {
+                DateTime time = new DateTime((long) value);
+                /*
+                 * Time range is ignored for gridded layers
+                 */
+                edalDataLayer.setTime(time, null);
             }
             break;
         default:
@@ -866,16 +866,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
     @Override
     public void sliderSettled(String id) {
         if (edalDataLayer != null) {
-            if (edalDataLayer instanceof EdalGridDataLayer) {
-                /*
-                 * Cache all of the times at this elevation and all of the
-                 * elevations at this time.
-                 * 
-                 * This means that we don't cache everything, but anything that
-                 * might be used gets cached when required
-                 */
-                ((EdalGridDataLayer) edalDataLayer).cacheFromCurrent();
-            } else if (edalDataLayer instanceof EdalProfileDataLayer) {
+            if (edalDataLayer instanceof EdalProfileDataLayer) {
                 /*
                  * If we have a profile layer, we wait until the time slider has
                  * settled before changing the time, since extraction can be

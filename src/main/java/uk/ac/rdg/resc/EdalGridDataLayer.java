@@ -125,14 +125,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     private Cache imageCache;
     private String plotStyleName;
 
-    /** The thread for caching different times */
-    private TimeCacher timeCacheTask = null;
-    /** The thread for caching different elevations */
-    private ElevationCacher elevationCacheTask = null;
-
-    private CacheListener cacheListener;
-    private boolean gpuCachingEnabled = false;
-
     /**
      * Instantiate a new {@link EdalGridDataLayer}
      * 
@@ -158,7 +150,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
 
         this.layerName = layerName;
         this.catalogue = catalogue;
-        this.cacheListener = cacheListener;
 
         /*
          * No need to check that this is the correct type - that has already
@@ -220,26 +211,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
         setPickEnabled(true);
 
         setForceLevelZeroLoads(true);
-        setRetainLevelZeroTiles(false);
-
-        /*
-         * Now start caching data in the background. This allows users to change
-         * the elevation/time and have a smooth transition
-         */
-        cacheFromCurrent();
-    }
-
-    @Override
-    public void destroy() {
-        /*
-         * Stop any caching
-         */
-        if (timeCacheTask != null) {
-            timeCacheTask.stopCaching();
-        }
-        if (elevationCacheTask != null) {
-            elevationCacheTask.stopCaching();
-        }
+        setRetainLevelZeroTiles(true);
     }
 
     @Override
@@ -290,7 +262,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     @Override
     public void scaleLimitsChanged(Extent<Float> newScaleRange) {
         this.scaleRange = newScaleRange;
-        cacheFromCurrent();
         mapImageChanged();
         drawLayer();
     }
@@ -298,7 +269,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     @Override
     public void paletteChanged(String newPalette) {
         this.palette = newPalette;
-        cacheFromCurrent();
         mapImageChanged();
         drawLayer();
     }
@@ -306,7 +276,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     @Override
     public void aboveMaxColourChanged(Color aboveMax) {
         this.overColor = aboveMax;
-        cacheFromCurrent();
         mapImageChanged();
         drawLayer();
     }
@@ -314,7 +283,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     @Override
     public void belowMinColourChanged(Color belowMin) {
         this.underColor = belowMin;
-        cacheFromCurrent();
         mapImageChanged();
         drawLayer();
     }
@@ -335,7 +303,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
         this.overColor = aboveMax;
         this.logScale = logScaling;
         this.numColorBands = numColourBands;
-        cacheFromCurrent();
         mapImageChanged();
         drawLayer();
     }
@@ -380,88 +347,11 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
      */
     private void drawLayer() {
         setExpiryTime(System.currentTimeMillis());
+        firePropertyChange(AVKey.LAYER, null, this);
     }
 
-    /**
-     * Preloads into the GPU texture cache:
-     * 
-     * All available times at the current elevation
-     * 
-     * All available elevations at the current time
-     * 
-     * If such a caching operation is already running, this will stop the
-     * previous caching activity and start a new one. Previously cached data
-     * will not be recomputed, so this method should be quick to run.
-     */
-    public void cacheFromCurrent() {
-        if (!gpuCachingEnabled) {
-            return;
-        } else {
-            if (timeCacheTask != null) {
-                timeCacheTask.stopCaching();
-            }
-            if (elevationCacheTask != null) {
-                elevationCacheTask.stopCaching();
-            }
-
-            if (tAxis != null) {
-                timeCacheTask = new TimeCacher(time, elevation, cacheListener);
-                VideoWall.getInstance().threadPool.submit(timeCacheTask);
-            }
-
-            if (zAxis != null) {
-                elevationCacheTask = new ElevationCacher(elevation, time, cacheListener);
-                VideoWall.getInstance().threadPool.submit(elevationCacheTask);
-            }
-        }
-    }
-
-    /**
-     * Does the actual caching work for a single elevation and time
-     * 
-     * @param elevation
-     *            The elevation to cache at
-     * @param time
-     *            The time to cache at
-     */
-    private void cacheEdalGrid(Double elevation, DateTime time) {
-        //                GpuResourceCache gpuResourceCache = wwd.getGpuResourceCache();
-        //        EdalGridData cacheLayer = new EdalGridData(elevation, time, palette, scaleRange, logScale,
-        //                numColorBands, bgColor, underColor, overColor, latLon, totalPointsX, totalPointsY);
-        //        Map<TileKey, TextureData> cacheData = new HashMap<TileKey, TextureData>();
-        //        /*
-        //         * Load the texture data for each tile. This may require actually
-        //         * generating the images so we do this first, to minimise the time which
-        //         * we are hogging the GLContext for
-        //         */
-        //        for (final TextureTile tile : cacheLayer.getTopLevels()) {
-        //            /*
-        //             * We can check if the cache contains a key without needing the
-        //             * GLContext to be current.
-        //             */
-        //            if (!gpuResourceCache.contains(tile.getTileKey())) {
-        //                cacheLayer.loadTexture(tile);
-        //                cacheData.put(tile.getTileKey(), tile.getTextureData());
-        //            }
-        //        }
-        //
-        //        /*
-        //         * Obtaining and releasing the GLContext takes enough time that checking
-        //         * whether we need to do so first makes a big difference
-        //         */
-        //        if (cacheData.size() > 0) {
-        //            /*
-        //             * Now get the GLContext, dump the textures into the cache and
-        //             * release it.
-        //             */
-        //            GLContext context = wwd.getContext();
-        //            context.makeCurrent();
-        //            for (Entry<TileKey, TextureData> cacheDatum : cacheData.entrySet()) {
-        //                gpuResourceCache.put(cacheDatum.getKey(),
-        //                        TextureIO.newTexture(cacheDatum.getValue()));
-        //            }
-        //            context.release();
-        //        }
+    @Override
+    public void destroy() {
     }
 
     /**
@@ -487,9 +377,8 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
         PlottingDomainParams params = new PlottingDomainParams(width, height, bbox, null, null,
                 null, elevation, time);
 
-        CacheKey key = new CacheKey(params, scaleRange, palette, underColor, overColor, logScale,
-                numColorBands);
-
+        CacheKey key = new CacheKey(layerName, params, scaleRange, palette, underColor, overColor,
+                logScale, numColorBands);
         BufferedImage image;
         Element element = imageCache.get(key);
         if (element != null && element.getObjectValue() != null) {
@@ -507,10 +396,9 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
                 return missingImage(tile);
             }
         }
-
         return image;
     }
-
+    
     protected void loadTexture(final TextureTile tile) {
         TextureData textureData;
 
@@ -563,21 +451,8 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
 
         @Override
         public void run() {
-            if (Thread.currentThread().isInterrupted()) {
-                /*
-                 * The task was cancelled because it's a duplicate or for some
-                 * other reason
-                 */
-                return;
-            }
-
             layer.loadTexture(tile);
-            /*
-             * This means that each tile gets displayed as it is loaded.
-             * 
-             * Without this we need to wait for a mouse movement...
-             */
-            firePropertyChange(AVKey.LAYER, null, layer);
+            EdalGridDataLayer.this.firePropertyChange(AVKey.LAYER, null, EdalGridDataLayer.this);
         }
 
         /*
@@ -682,6 +557,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
      * @author Guy Griffiths
      */
     private static class CacheKey implements Serializable {
+        private String layerName;
         private PlottingDomainParams params;
         private Extent<Float> scaleRange;
         private String palette;
@@ -690,8 +566,10 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
         private boolean logScaling;
         private int numColourBands;
 
-        public CacheKey(PlottingDomainParams params, Extent<Float> scaleRange, String palette,
-                Color belowMin, Color aboveMax, boolean logScaling, int numColourBands) {
+        public CacheKey(String layerName, PlottingDomainParams params, Extent<Float> scaleRange,
+                String palette, Color belowMin, Color aboveMax, boolean logScaling,
+                int numColourBands) {
+            this.layerName = layerName;
             this.params = params;
             this.scaleRange = scaleRange;
             this.palette = palette;
@@ -707,6 +585,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             int result = 1;
             result = prime * result + ((aboveMax == null) ? 0 : aboveMax.hashCode());
             result = prime * result + ((belowMin == null) ? 0 : belowMin.hashCode());
+            result = prime * result + ((layerName == null) ? 0 : layerName.hashCode());
             result = prime * result + (logScaling ? 1231 : 1237);
             result = prime * result + numColourBands;
             result = prime * result + ((palette == null) ? 0 : palette.hashCode());
@@ -734,6 +613,11 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
                     return false;
             } else if (!belowMin.equals(other.belowMin))
                 return false;
+            if (layerName == null) {
+                if (other.layerName != null)
+                    return false;
+            } else if (!layerName.equals(other.layerName))
+                return false;
             if (logScaling != other.logScaling)
                 return false;
             if (numColourBands != other.numColourBands)
@@ -754,125 +638,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             } else if (!scaleRange.equals(other.scaleRange))
                 return false;
             return true;
-        }
-    }
-
-    /**
-     * Class to cache all times at a fixed elevation
-     * 
-     * @author Guy Griffiths
-     */
-    private class TimeCacher implements Runnable {
-        private boolean stop = false;
-        private DateTime time;
-        private Double elevation;
-        private CacheListener cacheListener;
-
-        public TimeCacher(final DateTime time, final Double elevation,
-                final CacheListener cacheListener) {
-            this.time = time;
-            this.elevation = elevation;
-            this.cacheListener = cacheListener;
-        }
-
-        @Override
-        public void run() {
-            Thread.currentThread().setName("time-cache-" + layerName);
-            if (cacheListener != null) {
-                cacheListener.timeCachingIncomplete();
-            }
-            int timeIndex = tAxis.findIndexOf(time);
-            /*
-             * Cache times above the current
-             */
-            for (int i = timeIndex + 1; i < tAxis.size(); i++) {
-                if (stop) {
-                    if (cacheListener != null) {
-                        cacheListener.timeCachingComplete();
-                    }
-                    return;
-                }
-                cacheEdalGrid(elevation, tAxis.getCoordinateValue(i));
-            }
-            /*
-             * Now cache times below the current
-             */
-            for (int i = timeIndex - 1; i >= 0; i--) {
-                if (stop) {
-                    if (cacheListener != null) {
-                        cacheListener.timeCachingComplete();
-                    }
-                    return;
-                }
-                cacheEdalGrid(elevation, tAxis.getCoordinateValue(i));
-            }
-            String message = RescLogging.getMessage("resc.CachedTimes", layerName, elevation);
-            Logging.logger().finer(message);
-            if (cacheListener != null) {
-                cacheListener.timeCachingComplete();
-            }
-        }
-
-        public void stopCaching() {
-            stop = true;
-        }
-    }
-
-    /**
-     * Class to cache all elevations at a fixed time
-     * 
-     * @author Guy Griffiths
-     */
-    private class ElevationCacher implements Runnable {
-        private boolean stop = false;
-        private DateTime time;
-        private Double elevation;
-        private CacheListener cacheListener;
-
-        public ElevationCacher(final Double elevation, final DateTime time,
-                final CacheListener cacheListener) {
-            this.elevation = elevation;
-            this.time = time;
-            this.cacheListener = cacheListener;
-        }
-
-        @Override
-        public void run() {
-            Thread.currentThread().setName("elevation-cache-" + layerName);
-            if (cacheListener != null) {
-                cacheListener.elevationCachingIncomplete();
-            }
-            int zIndex = zAxis.findIndexOf(elevation);
-            /*
-             * Cache elevations above the current
-             */
-            for (int i = zIndex + 1; i < zAxis.size(); i++) {
-                if (stop) {
-                    return;
-                }
-                cacheEdalGrid(zAxis.getCoordinateValue(i), time);
-            }
-            /*
-             * Now cache elevations below the current
-             */
-            for (int i = zIndex - 1; i >= 0; i--) {
-                if (stop) {
-                    if (cacheListener != null) {
-                        cacheListener.elevationCachingComplete();
-                    }
-                    return;
-                }
-                cacheEdalGrid(zAxis.getCoordinateValue(i), time);
-            }
-            String message = RescLogging.getMessage("resc.CachedElevations", layerName, time);
-            Logging.logger().finer(message);
-            if (cacheListener != null) {
-                cacheListener.elevationCachingComplete();
-            }
-        }
-
-        public void stopCaching() {
-            stop = true;
         }
     }
 
