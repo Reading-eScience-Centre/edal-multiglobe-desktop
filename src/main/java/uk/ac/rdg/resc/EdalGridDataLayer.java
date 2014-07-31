@@ -86,7 +86,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     static int gridLayerNumber = 0;
 
     /** The ID of the layer in the EDAL system */
-    final String layerName;
+    private final String layerName;
     /** The {@link VideoWallCatalogue} containing the layer */
     private VideoWallCatalogue catalogue;
 
@@ -215,7 +215,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     }
 
     @Override
-    public void setElevation(double elevation, Extent<Double> elevationRange) {
+    public void setDataElevation(double elevation, Extent<Double> elevationRange) {
         /*
          * Set to the nearest available elevation. Elevation range is ignored
          * for gridded data
@@ -233,7 +233,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     }
 
     @Override
-    public Double getElevation() {
+    public Double getDataElevation() {
         return this.elevation;
     }
 
@@ -348,10 +348,6 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     private void drawLayer() {
         setExpiryTime(System.currentTimeMillis());
         firePropertyChange(AVKey.LAYER, null, this);
-    }
-
-    @Override
-    public void destroy() {
     }
 
     /**

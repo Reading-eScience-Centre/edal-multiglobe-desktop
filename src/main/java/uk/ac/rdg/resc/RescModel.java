@@ -43,7 +43,6 @@ import gov.nasa.worldwind.globes.projections.ProjectionModifiedSinusoidal;
 import gov.nasa.worldwind.globes.projections.ProjectionPolarEquidistant;
 import gov.nasa.worldwind.globes.projections.ProjectionSinusoidal;
 import gov.nasa.worldwind.layers.AnnotationLayer;
-import gov.nasa.worldwind.layers.Layer;
 import gov.nasa.worldwind.util.Logging;
 
 import java.awt.Color;
@@ -298,11 +297,6 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
             if (GridFeature.class.isAssignableFrom(mapFeatureType)) {
                 try {
                     tempLayer = new EdalGridDataLayer(layerName, catalogue, this);
-                    /*
-                     * TODO make EdalDataLayer implement Layer and remove the
-                     * cast.
-                     */
-                    getLayers().add((Layer) tempLayer);
                 } catch (EdalException e) {
                     String message = RescLogging.getMessage("resc.BadGridLayer");
                     Logging.logger().severe(message);
@@ -311,7 +305,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                 }
             } else if (ProfileFeature.class.isAssignableFrom(mapFeatureType)) {
                 try {
-                    tempLayer = new EdalProfileDataLayer(layerName, catalogue, getLayers(), wwd);
+                    tempLayer = new EdalProfileDataLayer(layerName, catalogue, wwd);
                 } catch (EdalException e) {
                     String message = RescLogging.getMessage("resc.BadProfileLayer");
                     Logging.logger().severe(message);
@@ -330,17 +324,13 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
              */
             if (edalDataLayer != null) {
                 /*
-                 * Destroy the previous layer. This will remove all data layers
-                 * from the layer list
+                 * Remove data layer from the layer list
                  */
-                edalDataLayer.destroy();
-                if (edalDataLayer instanceof EdalGridDataLayer) {
-                    EdalGridDataLayer edalGridDataLayer = (EdalGridDataLayer) edalDataLayer;
-                    getLayers().remove(edalGridDataLayer);
-                }
+                getLayers().remove(edalDataLayer);
             }
 
             edalDataLayer = tempLayer;
+            getLayers().add(edalDataLayer);
             /*
              * Wire up this data layer to the config layer which handles changes
              * in colour scale
@@ -443,7 +433,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
             /*
              * Set the slider value to the currently-selected elevation
              */
-            elevationSlider.setSliderValue(edalDataLayer.getElevation());
+            elevationSlider.setSliderValue(edalDataLayer.getDataElevation());
 
             /*
              * Find all elevation sliders on other models, and if they share the
@@ -460,7 +450,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                          * linked one
                          */
                         elevationSlider.setSliderValue(model.elevationSlider.getSliderValue());
-                        edalDataLayer.setElevation(model.elevationSlider.getSliderValue(),
+                        edalDataLayer.setDataElevation(model.elevationSlider.getSliderValue(),
                                 model.elevationSlider.getSliderRange());
                     }
                 }
@@ -647,7 +637,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                 Number value = null;
                 try {
                     value = catalogue.getLayerValue(edalLayerName, position,
-                            edalDataLayer.getElevation(), edalDataLayer.getTime(),
+                            edalDataLayer.getDataElevation(), edalDataLayer.getTime(),
                             elevationSlider == null ? null : elevationSlider.getSliderRange(),
                             getTimeSliderRange(), 0.5);
                 } catch (EdalException e) {
@@ -682,7 +672,15 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
 
                     String profileLocation = null;
                     String timeseriesLocation = null;
-                    if (metadata.getTemporalDomain() != null) {
+                    /*
+                     * Profile data layer has a temporal domain but doesn't
+                     * support timeseries extraction.
+                     * 
+                     * This doesn't cause a problem, but we do get warnings if
+                     * we try it.
+                     */
+                    if (metadata.getTemporalDomain() != null
+                            && !(edalDataLayer instanceof EdalProfileDataLayer)) {
                         /*
                          * Generate a timeseries graph
                          */
@@ -815,7 +813,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
         switch (id) {
         case ELEVATION_SLIDER:
             if (edalDataLayer != null) {
-                edalDataLayer.setElevation(value, valueRange);
+                edalDataLayer.setDataElevation(value, valueRange);
             }
             break;
         case TIME_SLIDER:

@@ -110,7 +110,7 @@ public class VideoWallContents {
         contents.linkedViewState = model.getWorldWindow().getView().getLinkedViewState();
         EdalDataLayer dataLayer = model.getDataLayer();
         if (dataLayer != null) {
-            contents.elevation = dataLayer.getElevation();
+            contents.elevation = dataLayer.getDataElevation();
             contents.time = dataLayer.getTime();
             contents.opacity = dataLayer.getOpacity();
             contents.plottingMetadata = dataLayer.getPlottingMetadata();

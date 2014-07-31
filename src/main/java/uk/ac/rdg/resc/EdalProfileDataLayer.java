@@ -76,21 +76,17 @@ import uk.ac.rdg.resc.logging.RescLogging;
  * 
  * @author Guy Griffiths
  */
-public class EdalProfileDataLayer implements EdalDataLayer {
+public class EdalProfileDataLayer extends MarkerLayer implements EdalDataLayer, SelectListener {
     private static final Color TRANSPARENT = new Color(0, true);
     private static final double MARKER_SIZE = 5.0;
 
     /** The ID of the layer in the EDAL system */
-    final String layerName;
+    private final String layerName;
     /** The {@link VideoWallCatalogue} containing the layer */
     private VideoWallCatalogue catalogue;
-    /** The {@link LayerList} to which the {@link EdalGridData} will be added */
-    private LayerList layerList;
     /** The {@link RescWorldWindow} which will display the layer */
     private RescWorldWindow wwd;
 
-    /** The actual data {@link gov.nasa.worldwind.layers.Layer} */
-    private EdalProfileData dataLayer;
     /** The current elevation */
     private Double elevation;
     /** The current elevation range */
@@ -120,6 +116,30 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     private Color underColor;
     /** The current colour for data above the maximum */
     private Color overColor;
+    
+    /** The {@link ColourScheme} to use for this layer */
+    private SegmentColourScheme colourScheme;
+    /**
+     * A list of {@link ProfileFeature}s which have values in the given time
+     * range
+     */
+    private List<ProfileFeature> features;
+    /**
+     * A list of {@link Marker}s which representing {@link ProfileFeature}s
+     * which are available for the given time range
+     */
+    private List<Marker> markers;
+    /**
+     * A list of {@link Marker}s which representing {@link ProfileFeature}s
+     * which are available for the given time range AND which intersect the
+     * currently-selected elevation range
+     */
+    private List<Marker> activeMarkers;
+    /** The ID of the variable being plotted */
+    private String varId;
+
+    /** Keep track of the last marker to be highlighted so that we can make it bigger */
+    private Marker lastHighlit = null;
 
     /**
      * Instantiate a new {@link EdalProfileDataLayer}
@@ -138,10 +158,9 @@ public class EdalProfileDataLayer implements EdalDataLayer {
      *             {@link VideoWallCatalogue}
      */
     public EdalProfileDataLayer(String layerName, VideoWallCatalogue catalogue,
-            LayerList layerList, RescWorldWindow wwd) throws EdalException {
+            RescWorldWindow wwd) throws EdalException {
         this.layerName = layerName;
         this.catalogue = catalogue;
-        this.layerList = layerList;
         this.wwd = wwd;
 
         metadata = catalogue.getVariableMetadataForLayer(layerName);
@@ -173,25 +192,30 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         logScale = plottingMetadata.isLogScaling();
         numColorBands = plottingMetadata.getNumColorBands();
         bgColor = new Color(0, true);
+        underColor = plottingMetadata.getBelowMinColour();
+        overColor = plottingMetadata.getAboveMaxColour();
         /*
-         * Make out-of-range points black but mostly transparent
+         * Make out of range slightly transparent
          */
-        underColor = new Color(0, 0, 0, 64);
-        overColor = new Color(0, 0, 0, 64);
+        underColor = new Color(underColor.getRed(), underColor.getGreen(), underColor.getBlue(), 64);
+        overColor = new Color(overColor.getRed(), overColor.getGreen(), overColor.getBlue(), 64);
 
-        drawLayer();
+        colourSchemeChanged();
+        
+        features = new ArrayList<>();
+        markers = new ArrayList<>();
+        activeMarkers = new ArrayList<>();
+
+        setName(layerName);
+        setPickEnabled(true);
+
+        wwd.addSelectListener(this);
+
+        extractNewProfiles();
     }
 
     @Override
-    public void destroy() {
-        /*
-         * Remove the data layer
-         */
-        layerList.remove(dataLayer);
-    }
-
-    @Override
-    public void setElevation(double elevation, Extent<Double> elevationRange) {
+    public void setDataElevation(double elevation, Extent<Double> elevationRange) {
         if (elevation > zDomain.getExtent().getHigh()) {
             this.elevation = zDomain.getExtent().getHigh();
         } else if (elevation < zDomain.getExtent().getLow()) {
@@ -200,13 +224,11 @@ public class EdalProfileDataLayer implements EdalDataLayer {
             this.elevation = elevation;
         }
         this.elevationRange = elevationRange;
-        if (dataLayer != null) {
-            dataLayer.redrawExistingProfiles();
-        }
+        redrawExistingProfiles();
     }
 
     @Override
-    public Double getElevation() {
+    public Double getDataElevation() {
         return this.elevation;
     }
 
@@ -214,7 +236,7 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     public void setTime(DateTime time, Extent<DateTime> timeRange) {
         this.time = GISUtils.getClosestTimeTo(time, tDomain);
         this.timeRange = timeRange;
-        drawLayer();
+        extractNewProfiles();
     }
 
     @Override
@@ -225,51 +247,36 @@ public class EdalProfileDataLayer implements EdalDataLayer {
     @Override
     public void scaleLimitsChanged(Extent<Float> newScaleRange) {
         this.scaleRange = newScaleRange;
-        dataLayer.colourSchemeChanged();
-        dataLayer.redrawExistingProfiles();
+        colourSchemeChanged();
+        redrawExistingProfiles();
     }
 
     @Override
     public void paletteChanged(String newPalette) {
         this.palette = newPalette;
-        dataLayer.colourSchemeChanged();
-        dataLayer.redrawExistingProfiles();
+        colourSchemeChanged();
+        redrawExistingProfiles();
     }
 
     @Override
     public void aboveMaxColourChanged(Color aboveMax) {
         this.overColor = aboveMax;
-        dataLayer.colourSchemeChanged();
-        dataLayer.redrawExistingProfiles();
+        colourSchemeChanged();
+        redrawExistingProfiles();
     }
 
     @Override
     public void belowMinColourChanged(Color belowMin) {
         this.underColor = belowMin;
-        dataLayer.colourSchemeChanged();
-        dataLayer.redrawExistingProfiles();
+        colourSchemeChanged();
+        redrawExistingProfiles();
     }
 
     @Override
     public void setNumColourBands(int numColourBands) {
         this.numColorBands = numColourBands;
-        dataLayer.colourSchemeChanged();
-        dataLayer.redrawExistingProfiles();
-    }
-
-    @Override
-    public void setOpacity(double opacity) {
-        if (dataLayer != null) {
-            dataLayer.setOpacity(opacity);
-        }
-    }
-
-    @Override
-    public double getOpacity() {
-        if (dataLayer != null) {
-            return dataLayer.getOpacity();
-        }
-        return 1.0;
+        colourSchemeChanged();
+        redrawExistingProfiles();
     }
 
     @Override
@@ -281,8 +288,19 @@ public class EdalProfileDataLayer implements EdalDataLayer {
         this.overColor = aboveMax;
         this.logScale = logScaling;
         this.numColorBands = numColourBands;
-        dataLayer.colourSchemeChanged();
-        dataLayer.redrawExistingProfiles();
+        colourSchemeChanged();
+        redrawExistingProfiles();
+    }
+
+    /**
+     * This re-calculates the colour scheme based on the values of the enclosing
+     * {@link EdalProfileDataLayer}, and should be called when any values have
+     * been changed.
+     */
+    public void colourSchemeChanged() {
+        ColourScale colourScale = new ColourScale(scaleRange, logScale);
+        colourScheme = new SegmentColourScheme(colourScale, underColor, overColor, bgColor,
+                palette, numColorBands);
     }
 
     @Override
@@ -298,214 +316,134 @@ public class EdalProfileDataLayer implements EdalDataLayer {
 
     @Override
     public BufferedImage getLegend(int size, boolean labels) {
-        if (dataLayer != null) {
-            return dataLayer.colourScheme.getScaleBar(LEGEND_WIDTH, size, 0.05f, true, true,
-                    Color.lightGray, new Color(0, 0, 0, 150));
-        } else {
-            String message = RescLogging.getMessage("resc.NoLayer");
-            Logging.logger().warning(message);
-        }
-        return null;
+        return colourScheme.getScaleBar(LEGEND_WIDTH, size, 0.05f, true, true, Color.lightGray,
+                new Color(0, 0, 0, 150));
     }
 
     /**
      * Does the actual drawing of the layer. This gets called when something has
      * changed and the layer needs redrawing.
      */
-    private void drawLayer() {
-        EdalProfileData tempLayer = new EdalProfileData();
-        if (dataLayer != null) {
-            layerList.remove(dataLayer);
-        }
-        dataLayer = tempLayer;
-        layerList.add(dataLayer);
+    private void extractNewProfiles() {
+        features = new ArrayList<>();
+        markers = new ArrayList<>();
+        activeMarkers = new ArrayList<>();
+
+        /*
+         * Start the feature extraction in a new thread, so that we don't get a
+         * pause
+         */
+        Executors.newSingleThreadExecutor().submit(new Runnable() {
+            @Override
+            public void run() {
+                List<? extends ProfileFeature> profileFeatures;
+                try {
+                    Dataset dataset = catalogue.getDatasetFromLayerName(layerName);
+                    varId = catalogue.getVariableFromId(layerName);
+                    profileFeatures = dataset.extractProfileFeatures(CollectionUtils.setOf(varId),
+                            new PlottingDomainParams(1, 1, BoundingBoxImpl.global(),
+                                    getVariableMetadata().getVerticalDomain().getExtent(),
+                                    timeRange, null, elevation, time));
+                } catch (EdalLayerNotFoundException e) {
+                    String message = RescLogging.getMessage("resc.NoLayer", layerName);
+                    Logging.logger().severe(message);
+                    return;
+                } catch (EdalException e) {
+                    String message = RescLogging.getMessage("resc.DataReadingProblem");
+                    Logging.logger().warning(message);
+                    return;
+                }
+
+                for (ProfileFeature profile : profileFeatures) {
+                    MarkerAttributes attrs = new BasicMarkerAttributes(new Material(TRANSPARENT),
+                            BasicMarkerShape.SPHERE, 1.0);
+                    attrs.setMarkerPixels(MARKER_SIZE);
+
+                    Marker marker = new BasicMarker(new Position(new LatLon(Angle
+                            .fromDegrees(profile.getHorizontalPosition().getY()), Angle
+                            .fromDegrees(profile.getHorizontalPosition().getX())), 0.0), attrs);
+
+                    features.add(profile);
+                    markers.add(marker);
+                }
+                redrawExistingProfiles();
+            }
+        });
+        this.setPickEnabled(true);
+        wwd.addSelectListener(this);
         wwd.redraw();
     }
 
     /**
-     * A {@link MarkerLayer} which holds markers for {@link ProfileFeature}s.
-     * This does not require precaching, so it can use the time/elevation values
-     * of it's parent {@link EdalProfileDataLayer} object.
-     * 
-     * @author Guy Griffiths
+     * This method refreshes the colours of any profiles which are plotted on
+     * the map. Because the entirety of each profile is extracted when a layer
+     * is created, this should be called when the elevation or colour scheme has
+     * changed. However, when the time values of the parent
+     * {@link EdalProfileDataLayer} change, new features need to be extracted,
+     * so calling this method will not do anything.
      */
-    public class EdalProfileData extends MarkerLayer implements SelectListener {
+    private void redrawExistingProfiles() {
+        activeMarkers.clear();
         /*
-         * We want to have one EdalProfileData layer per timestep. So when the
-         * time changes, we will remove the layer and add a new one (probably,
-         * unless removing/re-adding individual markers is quicker?).
-         * 
-         * For changing elevation though, we definitely want to keep a list of
-         * all profile features which were extracted and then just change the
-         * marker colour depending on elevation. If the desired elevation is out
-         * of range, remove the marker from the list of active onees.
+         * Go through map of profiles -> markers and set the colour
          */
-        /** The {@link ColourScheme} to use for this layer */
-        private SegmentColourScheme colourScheme;
-        /**
-         * A list of {@link ProfileFeature}s which have values in the given time
-         * range
-         */
-        private List<ProfileFeature> features;
-        /**
-         * A list of {@link Marker}s which representing {@link ProfileFeature}s
-         * which are available for the given time range
-         */
-        private List<Marker> markers;
-        /**
-         * A list of {@link Marker}s which representing {@link ProfileFeature}s
-         * which are available for the given time range AND which intersect the
-         * currently-selected elevation range
-         */
-        private List<Marker> activeMarkers;
-        /** The ID of the variable being plotted */
-        private String varId;
+        for (int i = 0; i < features.size(); i++) {
+            ProfileFeature profile = features.get(i);
 
-        private Marker lastHighlit = null;
-        private double opacity;
+            int zIndex = GISUtils.getIndexOfClosestElevationTo(elevation, profile.getDomain());
 
-        public EdalProfileData() {
-            super();
-
-            features = new ArrayList<>();
-            markers = new ArrayList<>();
-            activeMarkers = new ArrayList<>();
-
-            opacity = this.getOpacity();
-
-            colourSchemeChanged();
-
-            setName(layerName);
-            setPickEnabled(true);
-
-            /*
-             * Start the feature extraction in a new thread, so that we don't
-             * get a pause
-             */
-            Executors.newSingleThreadExecutor().submit(new Runnable() {
-                @Override
-                public void run() {
-                    List<? extends ProfileFeature> profileFeatures;
-                    try {
-                        Dataset dataset = catalogue.getDatasetFromLayerName(layerName);
-                        varId = catalogue.getVariableFromId(layerName);
-                        profileFeatures = dataset.extractProfileFeatures(CollectionUtils
-                                .setOf(varId),
-                                new PlottingDomainParams(1, 1, BoundingBoxImpl.global(),
-                                        getVariableMetadata().getVerticalDomain().getExtent(),
-                                        timeRange, null, elevation, time));
-                        System.out.println(profileFeatures.size()+" features extracted");
-                    } catch (EdalLayerNotFoundException e) {
-                        String message = RescLogging.getMessage("resc.NoLayer", layerName);
-                        Logging.logger().severe(message);
-                        return;
-                    } catch (EdalException e) {
-                        String message = RescLogging.getMessage("resc.DataReadingProblem");
-                        Logging.logger().warning(message);
-                        return;
-                    }
-
-                    for (ProfileFeature profile : profileFeatures) {
-                        MarkerAttributes attrs = new BasicMarkerAttributes(
-                                new Material(TRANSPARENT), BasicMarkerShape.SPHERE, 1.0);
-                        attrs.setMarkerPixels(MARKER_SIZE);
-
-                        Marker marker = new BasicMarker(new Position(new LatLon(Angle
-                                .fromDegrees(profile.getHorizontalPosition().getY()), Angle
-                                .fromDegrees(profile.getHorizontalPosition().getX())), 0.0), attrs);
-
-                        features.add(profile);
-                        markers.add(marker);
-                    }
-                    redrawExistingProfiles();
-                }
-            });
-            this.setPickEnabled(true);
-            wwd.addSelectListener(this);
-        }
-
-        /**
-         * This re-calculates the colour scheme based on the values of the
-         * enclosing {@link EdalProfileDataLayer}, and should be called when any
-         * values have been changed.
-         */
-        public void colourSchemeChanged() {
-            ColourScale colourScale = new ColourScale(scaleRange, logScale);
-            colourScheme = new SegmentColourScheme(colourScale, underColor, overColor, bgColor,
-                    palette, numColorBands);
-        }
-
-        /**
-         * This method refreshes the colours of any profiles which are plotted
-         * on the map. Because the entirety of each profile is extracted when a
-         * layer is created, this should be called when the elevation or colour
-         * scheme has changed. However, when the time values of the parent
-         * {@link EdalProfileDataLayer} change, new features need to be
-         * extracted, so calling this method will not do anything.
-         */
-        public void redrawExistingProfiles() {
-            activeMarkers.clear();
-            /*
-             * Go through map of profiles -> markers and set the colour
-             */
-            for (int i = 0; i < features.size(); i++) {
-                ProfileFeature profile = features.get(i);
-
-                int zIndex = GISUtils.getIndexOfClosestElevationTo(elevation, profile.getDomain());
-
-                Color markerColor;
-                if (profile.getDomain().getExtent().intersects(elevationRange) && zIndex >= 0) {
+            Color markerColor;
+            if (profile.getDomain().getExtent().intersects(elevationRange) && zIndex >= 0) {
+                /*
+                 * We want to draw this marker.
+                 */
+                Number value = profile.getValues(varId).get(zIndex);
+                markerColor = colourScheme.getColor(value);
+                if (markerColor.getAlpha() == 0) {
                     /*
-                     * We want to draw this marker.
+                     * We don't want transparent markers to be 100% transparent
+                     * (as in gridded fields), so we set the colour to be ~25%
+                     * instead
                      */
-                    Number value = profile.getValues(varId).get(zIndex);
-                    markerColor = colourScheme.getColor(value);
-                    if (markerColor.getAlpha() == 0) {
-                        /*
-                         * We don't want transparent markers to be 100%
-                         * transparent (as in gridded fields), so we set the
-                         * colour to be ~25% instead
-                         */
-                        markerColor = new Color(markerColor.getRed(), markerColor.getGreen(),
-                                markerColor.getBlue(), 64);
-                    }
-                    if (opacity < 1.0) {
-                        markerColor = new Color(markerColor.getRed(), markerColor.getGreen(),
-                                markerColor.getBlue(), (int) (markerColor.getAlpha() * opacity));
-                    }
-                    markers.get(i).getAttributes().setMaterial(new Material(markerColor));
-                    activeMarkers.add(markers.get(i));
+                    markerColor = new Color(markerColor.getRed(), markerColor.getGreen(),
+                            markerColor.getBlue(), 64);
                 }
+                if (getOpacity() < 1.0) {
+                    markerColor = new Color(markerColor.getRed(), markerColor.getGreen(),
+                            markerColor.getBlue(), (int) (markerColor.getAlpha() * getOpacity()));
+                }
+                markers.get(i).getAttributes().setMaterial(new Material(markerColor));
+                activeMarkers.add(markers.get(i));
             }
-            EdalProfileData.this.setMarkers(activeMarkers);
         }
+        setMarkers(activeMarkers);
+    }
 
-        @Override
-        public void setOpacity(double opacity) {
-            this.opacity = opacity;
-            redrawExistingProfiles();
+    @Override
+    public void setOpacity(double opacity) {
+        super.setOpacity(opacity);
+        redrawExistingProfiles();
+    }
+
+    @Override
+    public void selected(SelectEvent event) {
+        /*
+         * For profiles, we handle the select events here. This is different to
+         * gridded data, where the Layer is not pickable in the same way
+         */
+        if (lastHighlit != null
+                && (!event.hasObjects() || !event.getTopObject().equals(lastHighlit))) {
+            lastHighlit.getAttributes().setMarkerPixels(MARKER_SIZE);
+            lastHighlit = null;
         }
-
-        @Override
-        public void selected(SelectEvent event) {
-            /*
-             * For profiles, we handle the select events here. This is different
-             * to gridded data, where the Layer is not pickable in the same way
-             */
-            if (lastHighlit != null
-                    && (!event.hasObjects() || !event.getTopObject().equals(lastHighlit))) {
-                lastHighlit.getAttributes().setMarkerPixels(MARKER_SIZE);
-                lastHighlit = null;
-            }
-            if (event.hasObjects()) {
-                Object topObject = event.getTopObject();
-                if (topObject instanceof Marker) {
-                    if (event.isRollover()) {
-                        lastHighlit = (Marker) topObject;
-                        lastHighlit.getAttributes().setMarkerPixels(MARKER_SIZE * 1.5);
-                    } else if (event.isLeftClick()) {
-                        wwd.getModel().showFeatureInfo(((Marker) topObject).getPosition(), true);
-                    }
+        if (event.hasObjects()) {
+            Object topObject = event.getTopObject();
+            if (topObject instanceof Marker) {
+                if (event.isRollover()) {
+                    lastHighlit = (Marker) topObject;
+                    lastHighlit.getAttributes().setMarkerPixels(MARKER_SIZE * 1.5);
+                } else if (event.isLeftClick()) {
+                    wwd.getModel().showFeatureInfo(((Marker) topObject).getPosition(), true);
                 }
             }
         }

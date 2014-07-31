@@ -114,7 +114,7 @@ public class OptionsWindow extends JDialog {
                                  * TODO persist elevation range...
                                  */
                                 if (contents.getElevation() != null) {
-                                    dataLayer.setElevation(
+                                    dataLayer.setDataElevation(
                                             contents.getElevation(),
                                             Extents.newExtent(contents.getElevation(),
                                                     contents.getElevation()));
