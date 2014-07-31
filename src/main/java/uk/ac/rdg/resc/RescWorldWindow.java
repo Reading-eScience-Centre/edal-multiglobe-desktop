@@ -31,7 +31,7 @@ package uk.ac.rdg.resc;
 import gov.nasa.worldwind.Model;
 import gov.nasa.worldwind.View;
 import gov.nasa.worldwind.WorldWindow;
-import gov.nasa.worldwind.awt.WorldWindowGLCanvas;
+import gov.nasa.worldwind.awt.WorldWindowGLJPanel;
 import gov.nasa.worldwind.geom.Position;
 
 import java.awt.event.MouseEvent;
@@ -49,7 +49,7 @@ import uk.ac.rdg.resc.input.RescInputHandler;
  * @author Guy Griffiths
  */
 @SuppressWarnings("serial")
-public class RescWorldWindow extends WorldWindowGLCanvas {
+public class RescWorldWindow extends WorldWindowGLJPanel {
     /**
      * Instantiates a new {@link RescWorldWindow}.
      * 

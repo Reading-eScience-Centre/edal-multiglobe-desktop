@@ -30,20 +30,19 @@ package uk.ac.rdg.resc;
 
 import gov.nasa.worldwind.util.Logging;
 
-import java.awt.Button;
-import java.awt.Dimension;
-import java.awt.Frame;
-import java.awt.Point;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.List;
 
-import javax.swing.BoxLayout;
-import javax.swing.JDialog;
-import javax.swing.JFileChooser;
-import javax.swing.filechooser.FileNameExtensionFilter;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
+
 import javax.xml.bind.JAXBException;
 
 import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
@@ -54,142 +53,131 @@ import uk.ac.rdg.resc.persist.VideoWallLayout;
 import uk.ac.rdg.resc.persist.VideoWallRow;
 
 /**
- * 
+ * Options window which implements load, save, and exit
  *
  * @author Guy Griffiths
  */
-@SuppressWarnings("serial")
-public class OptionsWindow extends JDialog {
+public class OptionsWindow extends Stage {
     private static final int WIDTH = 500;
 
     private Button load;
     private Button save;
     private Button exit;
 
-    public OptionsWindow(final MultiGlobeFrame frame, Frame owner) {
-        super(owner, "Options", true);
-        this.setSize(WIDTH, 200);
-        if (owner != null) {
-            Dimension parentSize = owner.getSize();
-            Point p = owner.getLocation();
-            setLocation(p.x + parentSize.width / 4, p.y + parentSize.height / 4);
-        }
-
+    public OptionsWindow(Stage parent, final MultiGlobeFrame frame) {
         load = new Button("Load Layout");
-        load.addActionListener(new ActionListener() {
+        load.setPrefWidth(WIDTH);
+        load.setOnAction(new EventHandler<ActionEvent>() {
             @Override
-            public void actionPerformed(ActionEvent event) {
-                JFileChooser chooser = new JFileChooser();
-                if (chooser.showOpenDialog(OptionsWindow.this) == JFileChooser.APPROVE_OPTION) {
-                    File loadFile = chooser.getSelectedFile();
-                    try {
-                        VideoWallLayout layout = VideoWallLayout.fromFile(loadFile);
-                        List<VideoWallRow> rows = layout.getRows();
-                        int nRows = rows.size();
-                        int nCols = rows.get(0).getColumns().size();
-                        frame.setShape(nRows, nCols);
-                        for (int i = 0; i < nRows; i++) {
-                            List<VideoWallContents> columns = rows.get(i).getColumns();
-                            for (int j = 0; j < nCols; j++) {
-                                VideoWallContents contents = columns.get(j);
-                                RescModel model = frame.getModelAt(i, j);
-                                NcwmsVariable plottingMetadata = contents.getPlottingMetadata();
-                                model.setDataLayer(plottingMetadata.getId());
-                                /*
-                                 * Set the layer plotting properties
-                                 */
-                                EdalDataLayer dataLayer = model.getDataLayer();
-                                dataLayer.bulkChange(plottingMetadata.getColorScaleRange(),
-                                        plottingMetadata.getPalette(),
-                                        plottingMetadata.getBelowMinColour(),
-                                        plottingMetadata.getAboveMaxColour(),
-                                        plottingMetadata.isLogScaling(),
-                                        plottingMetadata.getNumColorBands());
-                                /*
-                                 * Make sure that the palette widget matches
-                                 */
-                                model.getConfigLayer().getPaletteSelector()
-                                        .setPaletteProperties(plottingMetadata);
-                                /*
-                                 * TODO persist elevation range...
-                                 */
-                                if (contents.getElevation() != null) {
-                                    dataLayer.setDataElevation(
-                                            contents.getElevation(),
-                                            Extents.newExtent(contents.getElevation(),
-                                                    contents.getElevation()));
-                                }
-                                /*
-                                 * TODO persist time range...
-                                 */
-                                if (contents.getTime() != null) {
-                                    dataLayer.setTime(
-                                            contents.getTime(),
-                                            Extents.newExtent(contents.getTime(),
-                                                    contents.getTime()));
-                                }
-                                model.getConfigLayer().setLinkState(contents.getLinkedViewState());
-                                model.setFlat(contents.isFlatMap());
-                                model.setProjection(contents.getMapProjection());
-                                dataLayer.setOpacity(contents.getOpacity());
-                                LinkedView view = model.getWorldWindow().getView();
-                                /*
-                                 * This triggers the linked views to be set
-                                 */
-                                view.setCenterPosition(view.getCenterPosition());
+            public void handle(ActionEvent event) {
+                FileChooser chooser = new FileChooser();
+                chooser.setTitle("Choose file to load");
+                File loadFile = chooser.showOpenDialog(OptionsWindow.this);
+                try {
+                    VideoWallLayout layout = VideoWallLayout.fromFile(loadFile);
+                    List<VideoWallRow> rows = layout.getRows();
+                    int nRows = rows.size();
+                    int nCols = rows.get(0).getColumns().size();
+                    frame.setShape(nRows, nCols);
+                    for (int i = 0; i < nRows; i++) {
+                        List<VideoWallContents> columns = rows.get(i).getColumns();
+                        for (int j = 0; j < nCols; j++) {
+                            VideoWallContents contents = columns.get(j);
+                            RescModel model = frame.getModelAt(i, j);
+                            NcwmsVariable plottingMetadata = contents.getPlottingMetadata();
+                            model.setDataLayer(plottingMetadata.getId());
+                            /*
+                             * Set the layer plotting properties
+                             */
+                            EdalDataLayer dataLayer = model.getDataLayer();
+                            dataLayer.bulkChange(plottingMetadata.getColorScaleRange(),
+                                    plottingMetadata.getPalette(),
+                                    plottingMetadata.getBelowMinColour(),
+                                    plottingMetadata.getAboveMaxColour(),
+                                    plottingMetadata.isLogScaling(),
+                                    plottingMetadata.getNumColorBands());
+                            /*
+                             * Make sure that the palette widget matches
+                             */
+                            model.getConfigLayer().getPaletteSelector()
+                                    .setPaletteProperties(plottingMetadata);
+                            /*
+                             * TODO persist elevation range...
+                             */
+                            if (contents.getElevation() != null) {
+                                dataLayer.setDataElevation(
+                                        contents.getElevation(),
+                                        Extents.newExtent(contents.getElevation(),
+                                                contents.getElevation()));
                             }
+                            /*
+                             * TODO persist time range...
+                             */
+                            if (contents.getTime() != null) {
+                                dataLayer.setTime(contents.getTime(),
+                                        Extents.newExtent(contents.getTime(), contents.getTime()));
+                            }
+                            model.getConfigLayer().setLinkState(contents.getLinkedViewState());
+                            model.setFlat(contents.isFlatMap());
+                            model.setProjection(contents.getMapProjection());
+                            dataLayer.setOpacity(contents.getOpacity());
+                            LinkedView view = model.getWorldWindow().getView();
+                            /*
+                             * This triggers the linked views to be set
+                             */
+                            view.setCenterPosition(view.getCenterPosition());
                         }
-                    } catch (JAXBException e) {
-                        String msg = Logging.getMessage("resc.SettingsLoadProblem");
-                        Logging.logger().severe(msg);
-                    } catch (EdalLayerNotFoundException e) {
-                        String msg = Logging.getMessage("resc.SettingsLoadProblem");
-                        Logging.logger().severe(msg);
-                    } finally {
-                        OptionsWindow.this.setVisible(false);
                     }
+                } catch (JAXBException e) {
+                    String msg = Logging.getMessage("resc.SettingsLoadProblem");
+                    Logging.logger().severe(msg);
+                } catch (EdalLayerNotFoundException e) {
+                    String msg = Logging.getMessage("resc.SettingsLoadProblem");
+                    Logging.logger().severe(msg);
+                } finally {
+                    OptionsWindow.this.close();
+                    ;
                 }
             }
         });
 
         save = new Button("Save Layout");
-        save.addActionListener(new ActionListener() {
+        save.setPrefWidth(WIDTH);
+        save.setOnAction(new EventHandler<ActionEvent>() {
             @Override
-            public void actionPerformed(ActionEvent event) {
-                JFileChooser chooser = new JFileChooser();
-                chooser.addChoosableFileFilter(new FileNameExtensionFilter("XML Files", "xml"));
-                if (chooser.showSaveDialog(OptionsWindow.this) == JFileChooser.APPROVE_OPTION) {
-                    File saveFile = chooser.getSelectedFile();
-                    VideoWallLayout layout = VideoWallLayout.fromMultiGlobeFrame(frame);
-                    try {
-                        VideoWallLayout.toFile(layout, saveFile);
-                    } catch (JAXBException e) {
-                        String msg = Logging.getMessage("resc.SettingsSaveProblem");
-                        Logging.logger().severe(msg);
-                    } finally {
-                        OptionsWindow.this.setVisible(false);
-                    }
+            public void handle(ActionEvent event) {
+                FileChooser chooser = new FileChooser();
+                chooser.setTitle("Choose file to save to");
+                chooser.setSelectedExtensionFilter(new ExtensionFilter("XML Files", "xml"));
+                File saveFile = chooser.showSaveDialog(OptionsWindow.this);
+                VideoWallLayout layout = VideoWallLayout.fromMultiGlobeFrame(frame);
+                try {
+                    VideoWallLayout.toFile(layout, saveFile);
+                } catch (JAXBException e) {
+                    String msg = Logging.getMessage("resc.SettingsSaveProblem");
+                    Logging.logger().severe(msg);
+                } finally {
+                    OptionsWindow.this.close();
                 }
             }
         });
 
-        exit = new Button("Exit Program");
-        exit.addActionListener(new ActionListener() {
+        exit = new Button("Exit");
+        exit.setPrefWidth(WIDTH);
+        exit.setOnAction(new EventHandler<ActionEvent>() {
             @Override
-            public void actionPerformed(ActionEvent e) {
-                OptionsWindow.this.setVisible(false);
-                OptionsWindow.this.dispose();
-                owner.dispatchEvent(new WindowEvent(owner, WindowEvent.WINDOW_CLOSING));
+            public void handle(ActionEvent event) {
+                parent.close();
+                OptionsWindow.this.close();
             }
         });
 
-        VideoWall.setDefaultButtonOptions(load);
-        VideoWall.setDefaultButtonOptions(save);
-        VideoWall.setDefaultButtonOptions(exit);
-        
-        this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
-        this.getContentPane().add(load);
-        this.getContentPane().add(save);
-        this.getContentPane().add(exit);
+        VBox box = new VBox(load, save, exit);
+        box.setPrefWidth(WIDTH);
+        Scene scene = new Scene(box);
+        setScene(scene);
+
+        initModality(Modality.APPLICATION_MODAL);
+        initOwner(parent);
     }
 }

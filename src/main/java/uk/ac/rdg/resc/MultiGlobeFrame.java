@@ -1,19 +1,19 @@
 /*******************************************************************************
  * Copyright (c) 2014 The University of Reading
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
+ * notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
  * 3. Neither the name of the University of Reading, nor the names of the
- *    authors or contributors may be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- * 
+ * authors or contributors may be used to endorse or promote products
+ * derived from this software without specific prior written permission.
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -28,28 +28,35 @@
 
 package uk.ac.rdg.resc;
 
-import java.awt.GridLayout;
 import java.io.IOException;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 
 import javafx.embed.swing.SwingNode;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.RowConstraints;
 
 import javax.swing.JPanel;
 
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
 
 /**
- * A {@link GridPane} which can hold multiple {@link RescWorldWindow}s and has
+ * A {@link JPanel} which can hold multiple {@link RescWorldWindow}s and has
  * methods for creating and removing them
- * 
+ *
  * @author Guy Griffiths
  */
-@SuppressWarnings("serial")
-public class MultiGlobeFrame extends JPanel {
-    static final int GAP = 2;
-    
+public class MultiGlobeFrame extends GridPane {
+    private static final ColumnConstraints CC = new ColumnConstraints();
+    private static final RowConstraints RC = new RowConstraints();
+    static {
+        CC.setHgrow(Priority.ALWAYS);
+        RC.setVgrow(Priority.ALWAYS);
+    }
+
     /**
      * A list of {@link RescWorldWindow}s contained within this
      * {@link MultiGlobeFrame}
@@ -71,9 +78,25 @@ public class MultiGlobeFrame extends JPanel {
         this.featureCatalogue = featureCatalogue;
 
         /*
+         * This will be the colour of the borders between panels
+         */
+        setStyle("-fx-base: #aaaaaa;");
+
+        /*
+         * Although the borders seem to not be redrawn properly, so set them to
+         * 0...
+         */
+        setHgap(0);
+        setVgap(0);
+
+        setMaxHeight(Double.MAX_VALUE);
+        setMaxWidth(Double.MAX_VALUE);
+
+        /*
          * Initialise the frame to contain a single globe
          */
         setShape(1, 1);
+
     }
 
     /**
@@ -157,7 +180,7 @@ public class MultiGlobeFrame extends JPanel {
 
     /**
      * Sets the number of rows and columns
-     * 
+     *
      * @param rows
      *            The desired number of rows
      * @param columns
@@ -170,8 +193,9 @@ public class MultiGlobeFrame extends JPanel {
         while (this.rows > rows) {
             for (int i = this.columns - 1; i >= 0; i--) {
                 panels.remove(getIndex(this.rows - 1, i));
-                remove(getIndex(this.rows - 1, i));
+                getChildren().remove(getIndex(this.rows - 1, i));
             }
+            getRowConstraints().remove(getRowConstraints().size() - 1);
             this.rows--;
         }
 
@@ -181,8 +205,9 @@ public class MultiGlobeFrame extends JPanel {
         while (this.columns > columns) {
             for (int i = this.rows - 1; i >= 0; i--) {
                 panels.remove(getIndex(i, this.columns - 1));
-                remove(getIndex(i, this.columns - 1));
+                getChildren().remove(getIndex(i, this.columns - 1));
             }
+            getColumnConstraints().remove(getColumnConstraints().size() - 1);
             this.columns--;
         }
 
@@ -194,10 +219,13 @@ public class MultiGlobeFrame extends JPanel {
              * Add one panel at the bottom of each column
              */
             for (int i = 0; i < this.columns; i++) {
-                RescWorldWindow newPanel = getNewPanel(null);
+                SwingNode panelNode = new SwingNode();
+                RescWorldWindow newPanel = getNewPanel(panelNode);
                 panels.add(newPanel);
-                add(newPanel);
+                panelNode.setContent(newPanel);
+                add(panelNode, i, this.rows);
             }
+            getRowConstraints().add(RC);
             this.rows++;
         }
 
@@ -206,21 +234,18 @@ public class MultiGlobeFrame extends JPanel {
          */
         while (this.columns < columns) {
             /*
-             * Add from the bottom up, otherwise the indexes change
+             * Add from the bottom up, otherwise the indices change
              */
             for (int i = this.rows - 1; i >= 0; i--) {
-                RescWorldWindow newPanel = getNewPanel(null);
+                SwingNode panelNode = new SwingNode();
+                RescWorldWindow newPanel = getNewPanel(panelNode);
                 panels.add(getIndex(i, this.columns), newPanel);
-                add(newPanel, getIndex(i, this.columns));
+                panelNode.setContent(newPanel);
+                add(panelNode, this.columns, i);
             }
+            getColumnConstraints().add(CC);
             this.columns++;
         }
-
-        /*
-         * Now set the layout
-         */
-        GridLayout gridLayout = new GridLayout(rows, columns, GAP, GAP);
-        setLayout(gridLayout);
 
         /*
          * Redraw all panels, since their size will have changed
@@ -228,16 +253,11 @@ public class MultiGlobeFrame extends JPanel {
         for (RescWorldWindow panel : panels) {
             panel.redraw();
         }
-
-        /*
-         * validate() needs to be called after add/remove
-         */
-        this.validate();
     }
 
     /**
      * Convenience method
-     * 
+     *
      * @return A new {@link RescWorldWindow}
      */
     private RescWorldWindow getNewPanel(SwingNode container) {
@@ -257,7 +277,7 @@ public class MultiGlobeFrame extends JPanel {
 
     /**
      * Gets the index in the panels list of a given panel
-     * 
+     *
      * @param row
      *            The row of the panel
      * @param column
