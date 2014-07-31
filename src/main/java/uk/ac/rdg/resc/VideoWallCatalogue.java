@@ -109,7 +109,7 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
          * Update the menu. We do this prior to trying to cache the dataset.
          */
         addDatasetToMenu(dataset);
-//        System.out.println("Loaded metadata for dataset: " + dataset.getId());
+        Logging.logger().fine(RescLogging.getMessage("resc.DatasetMetadataLoaded", dataset.getId()));
         /*
          * For any variables which map to gridded features, preload into memory
          */
@@ -126,11 +126,8 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                     String layerName = getLayerName(dataset.getId(), variable.getId());
                     GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
                     gridFeatures.put(layerName, gridFeature);
-//                    System.out.println("grid feature cached in memory with ID:" + layerName);
+                    Logging.logger().fine(RescLogging.getMessage("resc.GridFeatureInMemory", dataset.getId()));
                 } catch (Exception e) {
-//                    System.out.println("Dataset " + dataset.getId()
-//                            + " couldn't be loaded into memory");
-                    e.printStackTrace();
                     /*
                      * Log, and ignore that it can't read data, but maybe it
                      * will work later (e.g. remote data).
@@ -147,7 +144,6 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                  */
             }
         }
-//        System.out.println(dataset.getId() + " loaded");
         String message = RescLogging.getMessage("resc.DatasetLoaded", dataset.getId());
         Logging.logger().fine(message);
     }
