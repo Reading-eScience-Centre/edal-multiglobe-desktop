@@ -46,6 +46,7 @@ import javax.xml.bind.JAXBException;
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
 
+import uk.ac.rdg.resc.edal.dataset.AbstractGridDataset;
 import uk.ac.rdg.resc.edal.dataset.Dataset;
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
@@ -55,6 +56,7 @@ import uk.ac.rdg.resc.edal.feature.MapFeature;
 import uk.ac.rdg.resc.edal.feature.PointFeature;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
+import uk.ac.rdg.resc.edal.geometry.BoundingBox;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
 import uk.ac.rdg.resc.edal.graphics.style.util.FeatureCatalogue;
 import uk.ac.rdg.resc.edal.metadata.GridVariableMetadata;
@@ -109,7 +111,8 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
          * Update the menu. We do this prior to trying to cache the dataset.
          */
         addDatasetToMenu(dataset);
-        Logging.logger().fine(RescLogging.getMessage("resc.DatasetMetadataLoaded", dataset.getId()));
+        Logging.logger()
+                .fine(RescLogging.getMessage("resc.DatasetMetadataLoaded", dataset.getId()));
         /*
          * For any variables which map to gridded features, preload into memory
          */
@@ -126,7 +129,8 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                     String layerName = getLayerName(dataset.getId(), variable.getId());
                     GridFeature gridFeature = (GridFeature) dataset.readFeature(variable.getId());
                     gridFeatures.put(layerName, gridFeature);
-                    Logging.logger().fine(RescLogging.getMessage("resc.GridFeatureInMemory", dataset.getId()));
+                    Logging.logger().fine(
+                            RescLogging.getMessage("resc.GridFeatureInMemory", dataset.getId()));
                 } catch (Exception e) {
                     /*
                      * Log, and ignore that it can't read data, but maybe it
@@ -252,16 +256,25 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
                 targetT = timeRange.getLow();
                 timeRange = null;
             }
+
+            BoundingBox bbox = null;
+            if (!(dataset instanceof AbstractGridDataset)) {
+                /*
+                 * We want to only use a target position for gridded datasets.
+                 * For in-situ, we want to use a bounding box with the given
+                 * sensitivity
+                 */
+                bbox = new BoundingBoxImpl(position.longitude.degrees - sensitivity,
+                        position.latitude.degrees - sensitivity, position.longitude.degrees
+                                + sensitivity, position.latitude.degrees + sensitivity,
+                        DefaultGeographicCRS.WGS84);
+            }
+
             List<? extends ProfileFeature> profileFeatures = dataset.extractProfileFeatures(
-                    CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1,
-                            new BoundingBoxImpl(position.longitude.degrees - sensitivity,
-                                    position.latitude.degrees - sensitivity,
-                                    position.longitude.degrees + sensitivity,
-                                    position.latitude.degrees + sensitivity,
-                                    DefaultGeographicCRS.WGS84), elevationRange, timeRange,
-                            new HorizontalPosition(position.longitude.degrees,
-                                    position.latitude.degrees, DefaultGeographicCRS.WGS84), null,
-                            targetT));
+                    CollectionUtils.setOf(varId), new PlottingDomainParams(1, 1, bbox,
+                            elevationRange, timeRange, new HorizontalPosition(
+                                    position.longitude.degrees, position.latitude.degrees,
+                                    DefaultGeographicCRS.WGS84), null, targetT));
             return profileFeatures;
         }
     }

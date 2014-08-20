@@ -335,6 +335,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             return mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0, 150), labels,
                     LEGEND_WIDTH);
         } catch (EdalException e) {
+            e.printStackTrace();
             String message = RescLogging.getMessage("resc.DataReadingProblem");
             Logging.logger().warning(message);
         }

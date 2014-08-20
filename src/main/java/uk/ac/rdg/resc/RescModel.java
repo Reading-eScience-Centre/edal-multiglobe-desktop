@@ -662,16 +662,16 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
 
                 balloon.setInfoText(valueText);
 
-                try {
-                    /*
-                     * Get the size of the panel (minus a border) to generate
-                     * the fullscreen graphs
-                     */
-                    int width = wwd.getWidth() - 52;
-                    int height = wwd.getHeight() - 52;
+                /*
+                 * Get the size of the panel (minus a border) to generate the
+                 * fullscreen graphs
+                 */
+                int width = wwd.getWidth() - 52;
+                int height = wwd.getHeight() - 52;
 
-                    String profileLocation = null;
-                    String timeseriesLocation = null;
+                String profileLocation = null;
+                String timeseriesLocation = null;
+                try {
                     /*
                      * Profile data layer has a temporal domain but doesn't
                      * support timeseries extraction.
@@ -732,6 +732,18 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                                             (int) (FeatureInfoBalloon.TARGET_HEIGHT / FeatureInfoBalloon.PREVIEW_SCALE));
                         }
                     }
+                } catch (Exception e) {
+                    /*
+                     * We want to catch any exceptions and log them.
+                     * EdalException and IOException are both possible, but we
+                     * catch Exception to cover all runtime errors too, since
+                     * the solution (log it) is the same.
+                     */
+                    String message = RescLogging.getMessage("resc.GraphProblem");
+                    Logging.logger().warning(message);
+                    e.printStackTrace();
+                }
+                try {
                     if (metadata.getVerticalDomain() != null) {
                         /*
                          * Generate a profile graph
