@@ -332,8 +332,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     @Override
     public BufferedImage getLegend(int size, boolean labels) {
         try {
-            return mapImage.getLegend(size, Color.lightGray, new Color(0, 0, 0, 150), labels,
-                    LEGEND_WIDTH);
+            return mapImage.getLegend(LEGEND_WIDTH, size, Color.lightGray, new Color(0, 0, 0, 150), labels, true, 0.1f, 0.05f);
         } catch (EdalException e) {
             e.printStackTrace();
             String message = RescLogging.getMessage("resc.DataReadingProblem");

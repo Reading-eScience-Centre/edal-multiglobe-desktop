@@ -46,10 +46,11 @@ import javax.xml.bind.JAXBException;
 import org.geotoolkit.referencing.crs.DefaultGeographicCRS;
 import org.joda.time.DateTime;
 
-import uk.ac.rdg.resc.edal.dataset.AbstractGridDataset;
+import uk.ac.rdg.resc.edal.dataset.GriddedDataset;
 import uk.ac.rdg.resc.edal.dataset.Dataset;
 import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
+import uk.ac.rdg.resc.edal.exceptions.VariableNotFoundException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
 import uk.ac.rdg.resc.edal.feature.GridFeature;
 import uk.ac.rdg.resc.edal.feature.MapFeature;
@@ -258,7 +259,7 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
             }
 
             BoundingBox bbox = null;
-            if (!(dataset instanceof AbstractGridDataset)) {
+            if (!(dataset instanceof GriddedDataset)) {
                 /*
                  * We want to only use a target position for gridded datasets.
                  * For in-situ, we want to use a bounding box with the given
@@ -354,9 +355,10 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
      * @return The corresponding {@link VariableMetadata}
      * @throws EdalLayerNotFoundException
      *             If the WMS layer name doesn't map to a variable
+     * @throws VariableNotFoundException 
      */
     public VariableMetadata getVariableMetadataForLayer(String layerName)
-            throws EdalLayerNotFoundException {
+            throws EdalLayerNotFoundException, VariableNotFoundException {
         Dataset dataset = getDatasetFromLayerName(layerName);
         String variableFromId = getVariableFromId(layerName);
         if (dataset != null && variableFromId != null) {
@@ -446,8 +448,9 @@ public class VideoWallCatalogue extends NcwmsCatalogue implements DatasetStorage
      * @throws EdalLayerNotFoundException
      *             If the layer does not exist in this
      *             {@link VideoWallCatalogue}
+     * @throws VariableNotFoundException
      */
-    public boolean layerIsGridded(String layerName) throws EdalLayerNotFoundException {
+    public boolean layerIsGridded(String layerName) throws EdalLayerNotFoundException, VariableNotFoundException {
         return getVariableMetadataForLayer(layerName) instanceof GridVariableMetadata;
     }
 }

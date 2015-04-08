@@ -3,8 +3,8 @@
 <!--Any of these can be overridden by specifying an application configuration document-->
 <WorldWindConfiguration version="1">
     <!-- Location of the EDAL catalogue config.xml file -->
-    <!-- Property name="uk.ac.rdg.resc.edal.multiglobe.CatalogueLocation"
-              value="/home/guy/.ncWMS-edal/config.xml"/ -->
+    <Property name="uk.ac.rdg.resc.edal.multiglobe.CatalogueLocation"
+              value="/home/guy/.ncWMS-edal/config.xml"/>
     <!-- Whether to run as a fullscreen application or not -->
     <Property name="uk.ac.rdg.resc.edal.multiglobe.Fullscreen" value="true"/>
     <!-- For multi-monitor systems, which screen should the fullscreen application run on -->
