@@ -40,7 +40,7 @@ import uk.ac.rdg.resc.EdalDataLayer;
 import uk.ac.rdg.resc.LinkedView.LinkedViewState;
 import uk.ac.rdg.resc.RescModel;
 import uk.ac.rdg.resc.RescModel.Projection;
-import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
 import uk.ac.rdg.resc.edal.util.TimeUtils;
 
 @XmlType(namespace = VideoWallLayout.NAMESPACE, name = "VideoWallPanelType")
@@ -58,6 +58,9 @@ public class VideoWallContents {
     private Double opacity = 1.0;
     @XmlElement
     private LinkedViewState linkedViewState = LinkedViewState.LINKED;
+    @XmlElement
+    private String layer = "";
+    
     /*
      * By using this, we get all of the XML stuff we need automatically! We also
      * get a variable ID which we can use to store the layer name! We can ignore
@@ -65,12 +68,16 @@ public class VideoWallContents {
      * the catalogue.
      */
     @XmlElement
-    private NcwmsVariable plottingMetadata;
+    private PlottingStyleParameters plottingMetadata;
 
     public VideoWallContents() {
         /*
          * TODO Make this private once tested properly
          */
+    }
+
+    public String getLayer() {
+        return layer;
     }
 
     public boolean isFlatMap() {
@@ -96,8 +103,8 @@ public class VideoWallContents {
     public LinkedViewState getLinkedViewState() {
         return linkedViewState;
     }
-
-    public NcwmsVariable getPlottingMetadata() {
+    
+    public PlottingStyleParameters getPlottingMetadata() {
         return plottingMetadata;
     }
 
@@ -110,6 +117,7 @@ public class VideoWallContents {
         contents.linkedViewState = model.getWorldWindow().getView().getLinkedViewState();
         EdalDataLayer dataLayer = model.getDataLayer();
         if (dataLayer != null) {
+            contents.layer = dataLayer.getName();
             contents.elevation = dataLayer.getDataElevation();
             contents.time = dataLayer.getTime();
             contents.opacity = dataLayer.getOpacity();

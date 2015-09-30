@@ -49,7 +49,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import uk.ac.rdg.resc.RescWorldWindow;
-import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
+import uk.ac.rdg.resc.edal.exceptions.VariableNotFoundException;
 import uk.ac.rdg.resc.godiva.shared.LayerMenuItem;
 import uk.ac.rdg.resc.logging.RescLogging;
 
@@ -272,7 +272,7 @@ public class LayerSelectorWidget extends ScreenAnnotation implements SelectListe
         if (wwd != null && wwd.getModel() != null) {
             try {
                 wwd.getModel().setDataLayer(layer);
-            } catch (EdalLayerNotFoundException e) {
+            } catch (VariableNotFoundException e) {
                 /*
                  * The layer has not been found. We can't do anything about
                  * this, but it shouldn't happen in normal operation (where did

@@ -48,7 +48,7 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.CacheManager;
@@ -62,16 +62,15 @@ import uk.ac.rdg.resc.edal.exceptions.EdalException;
 import uk.ac.rdg.resc.edal.geometry.BoundingBox;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
 import uk.ac.rdg.resc.edal.graphics.style.MapImage;
+import uk.ac.rdg.resc.edal.graphics.style.util.EnhancedVariableMetadata;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
+import uk.ac.rdg.resc.edal.graphics.style.util.SldTemplateStyleCatalogue;
 import uk.ac.rdg.resc.edal.grid.TimeAxis;
 import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.GridVariableMetadata;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
-import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
-import uk.ac.rdg.resc.edal.wms.GetMapStyleParams;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
-import uk.ac.rdg.resc.edal.wms.util.StyleDef;
 import uk.ac.rdg.resc.logging.RescLogging;
 
 import com.jogamp.opengl.util.texture.TextureData;
@@ -125,6 +124,8 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     private Cache imageCache;
     private String plotStyleName;
 
+    private SldTemplateStyleCatalogue styleCatalogue;
+
     /**
      * Instantiate a new {@link EdalGridDataLayer}
      * 
@@ -173,31 +174,29 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
             this.time = GISUtils.getClosestToCurrentTime(tAxis);
         }
 
-        WmsLayerMetadata plottingMetadata = catalogue.getLayerMetadata(layerName);
+        EnhancedVariableMetadata enhancedMetadata = catalogue.getLayerMetadata(catalogue
+                .getVariableMetadataForLayer(layerName));
         /*
          * Set up the default colour scale values
          */
-        scaleRange = plottingMetadata.getColorScaleRange();
-        palette = plottingMetadata.getPalette();
-        logScale = plottingMetadata.isLogScaling();
-        numColorBands = plottingMetadata.getNumColorBands();
-        bgColor = new Color(0, true);
-        underColor = Color.black;
-        overColor = Color.black;
+        if (enhancedMetadata != null) {
+            PlottingStyleParameters plottingMetadata = enhancedMetadata
+                    .getDefaultPlottingParameters();
+            scaleRange = plottingMetadata.getColorScaleRange();
+            palette = plottingMetadata.getPalette();
+            logScale = plottingMetadata.isLogScaling();
+            numColorBands = plottingMetadata.getNumColorBands();
+            bgColor = plottingMetadata.getNoDataColour();
+            underColor = plottingMetadata.getBelowMinColour();
+            overColor = plottingMetadata.getAboveMaxColour();
+        }
 
-        /*
-         * Create a MapImage object for generating the data images.
-         * 
-         * This uses the EDAL system to generate the default style for the given
-         * layer.
-         * 
-         * TODO support other pre-defined layer types.
-         */
-        List<StyleDef> supportedStyles = catalogue.getSupportedStyles(catalogue
+        styleCatalogue = SldTemplateStyleCatalogue.getStyleCatalogue();
+        Collection<String> supportedStyles = styleCatalogue.getSupportedStyles(catalogue
                 .getVariableMetadataForLayer(layerName));
-        for (StyleDef style : supportedStyles) {
-            if (style.getStyleName().startsWith("default")) {
-                plotStyleName = style.getStyleName();
+        for (String style : supportedStyles) {
+            if (style.startsWith("default")) {
+                plotStyleName = style;
             }
         }
         if (plotStyleName == null) {
@@ -309,9 +308,9 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
 
     private void mapImageChanged() {
         try {
-            mapImage = GetMapStyleParams.getMapImageFromStyleNameAndParams(catalogue, layerName,
-                    plotStyleName, palette, scaleRange, logScale, numColorBands, bgColor,
-                    underColor, overColor);
+            mapImage = styleCatalogue.getMapImageFromStyle(plotStyleName, getPlottingMetadata(),
+                    catalogue.getVariableMetadataForLayer(layerName),
+                    catalogue.getLayerNameMapper());
         } catch (EdalException e) {
             String message = RescLogging.getMessage("resc.MapImageProblem");
             Logging.logger().severe(message);
@@ -324,15 +323,16 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
     }
 
     @Override
-    public NcwmsVariable getPlottingMetadata() {
-        return new NcwmsVariable(layerName, scaleRange, palette, underColor, overColor, bgColor,
-                logScale ? "log" : "linear", numColorBands);
+    public PlottingStyleParameters getPlottingMetadata() {
+        return new PlottingStyleParameters(scaleRange, palette, overColor, underColor, bgColor,
+                logScale, numColorBands, 1f);
     }
 
     @Override
     public BufferedImage getLegend(int size, boolean labels) {
         try {
-            return mapImage.getLegend(LEGEND_WIDTH, size, Color.lightGray, new Color(0, 0, 0, 150), labels, true, 0.1f, 0.05f);
+            return mapImage.getLegend(LEGEND_WIDTH, size, Color.lightGray, new Color(0, 0, 0, 150),
+                    labels, true, 0.1f, 0.05f);
         } catch (EdalException e) {
             e.printStackTrace();
             String message = RescLogging.getMessage("resc.DataReadingProblem");
@@ -394,7 +394,7 @@ public class EdalGridDataLayer extends TiledImageLayer implements EdalDataLayer 
         }
         return image;
     }
-    
+
     protected void loadTexture(final TextureTile tile) {
         TextureData textureData;
 

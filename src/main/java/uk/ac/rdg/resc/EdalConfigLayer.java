@@ -42,7 +42,7 @@ import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 
 import uk.ac.rdg.resc.LinkedView.LinkedViewState;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
 import uk.ac.rdg.resc.widgets.LayerSelectorWidget;
 import uk.ac.rdg.resc.widgets.PaletteSelectorWidget;
 import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
@@ -264,7 +264,7 @@ public class EdalConfigLayer extends RenderableLayer implements SelectListener {
      */
     public void setLegend(EdalDataLayer edalDataLayer) {
         this.edalDataLayer = edalDataLayer;
-        WmsLayerMetadata plottingMetadata = edalDataLayer.getPlottingMetadata();
+        PlottingStyleParameters plottingMetadata = edalDataLayer.getPlottingMetadata();
         if (plottingMetadata != null) {
             paletteSelector.setPaletteProperties(plottingMetadata);
         }

@@ -56,19 +56,19 @@ import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.domain.TemporalDomain;
 import uk.ac.rdg.resc.edal.domain.VerticalDomain;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
+import uk.ac.rdg.resc.edal.exceptions.VariableNotFoundException;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.geometry.BoundingBoxImpl;
-import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
+import uk.ac.rdg.resc.edal.graphics.style.ScaleRange;
 import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
+import uk.ac.rdg.resc.edal.graphics.style.util.EnhancedVariableMetadata;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
-import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
 import uk.ac.rdg.resc.edal.util.CollectionUtils;
 import uk.ac.rdg.resc.edal.util.Extents;
 import uk.ac.rdg.resc.edal.util.GISUtils;
 import uk.ac.rdg.resc.edal.util.PlottingDomainParams;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
-import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.logging.RescLogging;
 
 /**
@@ -183,17 +183,22 @@ public class EdalProfileDataLayer extends MarkerLayer implements EdalDataLayer, 
             this.timeRange = Extents.newExtent(this.time, this.time);
         }
 
-        WmsLayerMetadata plottingMetadata = catalogue.getLayerMetadata(layerName);
+        EnhancedVariableMetadata enhancedMetadata = catalogue.getLayerMetadata(catalogue
+                .getVariableMetadataForLayer(layerName));
         /*
-         * Setup default colour scale values
+         * Set up the default colour scale values
          */
-        scaleRange = plottingMetadata.getColorScaleRange();
-        palette = plottingMetadata.getPalette();
-        logScale = plottingMetadata.isLogScaling();
-        numColorBands = plottingMetadata.getNumColorBands();
-        bgColor = new Color(0, true);
-        underColor = plottingMetadata.getBelowMinColour();
-        overColor = plottingMetadata.getAboveMaxColour();
+        if (enhancedMetadata != null) {
+            PlottingStyleParameters plottingMetadata = enhancedMetadata
+                    .getDefaultPlottingParameters();
+            scaleRange = plottingMetadata.getColorScaleRange();
+            palette = plottingMetadata.getPalette();
+            logScale = plottingMetadata.isLogScaling();
+            numColorBands = plottingMetadata.getNumColorBands();
+            bgColor = plottingMetadata.getNoDataColour();
+            underColor = plottingMetadata.getBelowMinColour();
+            overColor = plottingMetadata.getAboveMaxColour();
+        }
         /*
          * Make out of range slightly transparent
          */
@@ -298,7 +303,7 @@ public class EdalProfileDataLayer extends MarkerLayer implements EdalDataLayer, 
      * been changed.
      */
     public void colourSchemeChanged() {
-        ColourScale colourScale = new ColourScale(scaleRange, logScale);
+        ScaleRange colourScale = new ScaleRange(scaleRange, logScale);
         colourScheme = new SegmentColourScheme(colourScale, underColor, overColor, bgColor,
                 palette, numColorBands);
     }
@@ -309,9 +314,9 @@ public class EdalProfileDataLayer extends MarkerLayer implements EdalDataLayer, 
     }
 
     @Override
-    public NcwmsVariable getPlottingMetadata() {
-        return new NcwmsVariable(layerName, scaleRange, palette, underColor, overColor, bgColor,
-                logScale ? "log" : "linear", numColorBands);
+    public PlottingStyleParameters getPlottingMetadata() {
+        return new PlottingStyleParameters(scaleRange, palette, overColor,
+                underColor, bgColor, logScale, numColorBands, 1f);
     }
 
     @Override
@@ -339,12 +344,12 @@ public class EdalProfileDataLayer extends MarkerLayer implements EdalDataLayer, 
                 List<? extends ProfileFeature> profileFeatures;
                 try {
                     Dataset dataset = catalogue.getDatasetFromLayerName(layerName);
-                    varId = catalogue.getVariableFromId(layerName);
+                    varId = catalogue.getVariableMetadataForLayer(layerName).getId();
                     profileFeatures = dataset.extractProfileFeatures(CollectionUtils.setOf(varId),
                             new PlottingDomainParams(1, 1, BoundingBoxImpl.global(),
                                     getVariableMetadata().getVerticalDomain().getExtent(),
                                     timeRange, null, elevation, time));
-                } catch (EdalLayerNotFoundException e) {
+                } catch (VariableNotFoundException e) {
                     String message = RescLogging.getMessage("resc.NoLayer", layerName);
                     Logging.logger().severe(message);
                     return;

@@ -17,7 +17,7 @@
         <!-- Enables auto-insertion of licence in new source code files. 
             Could be extracted to a separate settings file, as per http://mevenide.codehaus.org/m2-site/mevenide2-netbeans/customizations.html -->
         <netbeans.hint.license>bsd-3clause</netbeans.hint.license>
-        <edal-version>1.0-SNAPSHOT</edal-version>
+        <edal-version>1.0.2</edal-version>
     </properties>
 
     <url>https://bitbucket.org/GuyGriffiths/edal-multiglobe-desktop</url>
@@ -209,9 +209,8 @@
         </dependency>
         <dependency>
             <groupId>uk.ac.rdg.resc</groupId>
-            <artifactId>ncWMS</artifactId>
-            <version>2.0-SNAPSHOT</version>
-            <classifier>classes</classifier>
+            <artifactId>edal-xml-catalogue</artifactId>
+            <version>${edal-version}</version>
         </dependency>
         <dependency>
             <groupId>gov.nasa</groupId>

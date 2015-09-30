@@ -46,9 +46,9 @@ import javax.swing.JFileChooser;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.xml.bind.JAXBException;
 
-import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
+import uk.ac.rdg.resc.edal.exceptions.VariableNotFoundException;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
 import uk.ac.rdg.resc.edal.util.Extents;
-import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.persist.VideoWallContents;
 import uk.ac.rdg.resc.persist.VideoWallLayout;
 import uk.ac.rdg.resc.persist.VideoWallRow;
@@ -93,23 +93,24 @@ public class OptionsWindow extends JDialog {
                             for (int j = 0; j < nCols; j++) {
                                 VideoWallContents contents = columns.get(j);
                                 RescModel model = frame.getModelAt(i, j);
-                                NcwmsVariable plottingMetadata = contents.getPlottingMetadata();
-                                model.setDataLayer(plottingMetadata.getId());
+                                model.setDataLayer(contents.getLayer());
+                                PlottingStyleParameters plottingParams = contents
+                                        .getPlottingMetadata();
                                 /*
                                  * Set the layer plotting properties
                                  */
                                 EdalDataLayer dataLayer = model.getDataLayer();
-                                dataLayer.bulkChange(plottingMetadata.getColorScaleRange(),
-                                        plottingMetadata.getPalette(),
-                                        plottingMetadata.getBelowMinColour(),
-                                        plottingMetadata.getAboveMaxColour(),
-                                        plottingMetadata.isLogScaling(),
-                                        plottingMetadata.getNumColorBands());
+                                dataLayer.bulkChange(plottingParams.getColorScaleRange(),
+                                        plottingParams.getPalette(),
+                                        plottingParams.getBelowMinColour(),
+                                        plottingParams.getAboveMaxColour(),
+                                        plottingParams.isLogScaling(),
+                                        plottingParams.getNumColorBands());
                                 /*
                                  * Make sure that the palette widget matches
                                  */
                                 model.getConfigLayer().getPaletteSelector()
-                                        .setPaletteProperties(plottingMetadata);
+                                        .setPaletteProperties(plottingParams);
                                 /*
                                  * TODO persist elevation range...
                                  */
@@ -142,7 +143,7 @@ public class OptionsWindow extends JDialog {
                     } catch (JAXBException e) {
                         String msg = Logging.getMessage("resc.SettingsLoadProblem");
                         Logging.logger().severe(msg);
-                    } catch (EdalLayerNotFoundException e) {
+                    } catch (VariableNotFoundException e) {
                         String msg = Logging.getMessage("resc.SettingsLoadProblem");
                         Logging.logger().severe(msg);
                     } finally {
@@ -186,7 +187,7 @@ public class OptionsWindow extends JDialog {
         VideoWall.setDefaultButtonOptions(load);
         VideoWall.setDefaultButtonOptions(save);
         VideoWall.setDefaultButtonOptions(exit);
-        
+
         this.getContentPane().setLayout(new BoxLayout(this.getContentPane(), BoxLayout.PAGE_AXIS));
         this.getContentPane().add(load);
         this.getContentPane().add(save);

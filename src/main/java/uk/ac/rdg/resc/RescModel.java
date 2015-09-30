@@ -63,11 +63,13 @@ import uk.ac.rdg.resc.edal.domain.Extent;
 import uk.ac.rdg.resc.edal.domain.TemporalDomain;
 import uk.ac.rdg.resc.edal.domain.VerticalDomain;
 import uk.ac.rdg.resc.edal.exceptions.EdalException;
+import uk.ac.rdg.resc.edal.exceptions.VariableNotFoundException;
 import uk.ac.rdg.resc.edal.feature.DiscreteFeature;
 import uk.ac.rdg.resc.edal.feature.GridFeature;
 import uk.ac.rdg.resc.edal.feature.PointSeriesFeature;
 import uk.ac.rdg.resc.edal.feature.ProfileFeature;
 import uk.ac.rdg.resc.edal.graphics.Charting;
+import uk.ac.rdg.resc.edal.graphics.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.edal.grid.TimeAxis;
 import uk.ac.rdg.resc.edal.grid.VerticalAxis;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
@@ -75,7 +77,6 @@ import uk.ac.rdg.resc.edal.position.HorizontalPosition;
 import uk.ac.rdg.resc.edal.position.VerticalCrs;
 import uk.ac.rdg.resc.edal.util.Extents;
 import uk.ac.rdg.resc.edal.util.TimeUtils;
-import uk.ac.rdg.resc.edal.wms.exceptions.EdalLayerNotFoundException;
 import uk.ac.rdg.resc.logging.RescLogging;
 import uk.ac.rdg.resc.widgets.FeatureInfoBalloon;
 import uk.ac.rdg.resc.widgets.SliderWidget.SliderWidgetHandler;
@@ -262,7 +263,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
      *             If the ID supplied dose not represent a layer in the
      *             {@link VideoWallCatalogue} attached to this {@link RescModel}
      */
-    public void setDataLayer(String layerName) throws EdalLayerNotFoundException {
+    public void setDataLayer(String layerName) throws VariableNotFoundException {
         System.out.println("setting data layer: " + layerName);
 
         /*
@@ -282,7 +283,7 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
              * Choose what type of EdalDataLayer to show
              */
             Class<? extends DiscreteFeature<?, ?>> mapFeatureType = dataset
-                    .getFeatureType(catalogue.getVariableFromId(layerName));
+                    .getFeatureType(catalogue.getVariableMetadataForLayer(layerName).getId());
 
             /*
              * Note that when we create an EdalDataLayer, it is not an instance
@@ -707,7 +708,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
 
                             JFreeChart timeseriesChart = Charting.createTimeSeriesPlot(timeseries,
                                     new HorizontalPosition(position.longitude.degrees,
-                                            position.latitude.degrees, DefaultGeographicCRS.WGS84));
+                                            position.latitude.degrees, DefaultGeographicCRS.WGS84),
+                                    null);
                             timeseriesChart.setBackgroundPaint(Color.white);
 
                             /*
@@ -769,7 +771,8 @@ public class RescModel extends BasicModel implements SliderWidgetHandler, CacheL
                             }
                             JFreeChart profileChart = Charting.createVerticalProfilePlot(profiles,
                                     new HorizontalPosition(position.longitude.degrees,
-                                            position.latitude.degrees, DefaultGeographicCRS.WGS84));
+                                            position.latitude.degrees, DefaultGeographicCRS.WGS84),
+                                    null);
                             profileChart.setBackgroundPaint(Color.white);
 
                             /*

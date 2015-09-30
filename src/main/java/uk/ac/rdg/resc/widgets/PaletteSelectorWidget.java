@@ -50,12 +50,12 @@ import java.util.Map;
 import uk.ac.rdg.resc.EdalConfigLayer;
 import uk.ac.rdg.resc.RescWorldWindow;
 import uk.ac.rdg.resc.edal.domain.Extent;
-import uk.ac.rdg.resc.edal.graphics.style.ColourScale;
 import uk.ac.rdg.resc.edal.graphics.style.ColourScheme;
+import uk.ac.rdg.resc.edal.graphics.style.ScaleRange;
 import uk.ac.rdg.resc.edal.graphics.style.SegmentColourScheme;
 import uk.ac.rdg.resc.edal.graphics.style.util.ColourPalette;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
 import uk.ac.rdg.resc.edal.util.Extents;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
 
 /**
  * A widget for selecting colour scale settings, including palette type, scale
@@ -309,7 +309,7 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
     private void populatePaletteImages() {
         paletteChooserPanel.removeAllChildren();
         for (final String palette : ColourPalette.getPredefinedPalettes()) {
-            SegmentColourScheme cs = new SegmentColourScheme(new ColourScale(0f, 1f, logScaling),
+            SegmentColourScheme cs = new SegmentColourScheme(new ScaleRange(0f, 1f, logScaling),
                     belowMinColour, aboveMaxColour, TRANSPARENT_COLOR, palette, numColourBands);
             BufferedImage scaleBar = cs.getScaleBar(1, 200, 0.0f, true, false, null, null);
             ImageAnnotation paletteImage = new ImageAnnotation(scaleBar);
@@ -394,7 +394,7 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
      *            The {@link Color} to use for data whose value is above the
      *            maximum scale value
      */
-    public void setPaletteProperties(WmsLayerMetadata plottingMetadata) {
+    public void setPaletteProperties(PlottingStyleParameters plottingMetadata) {
         setMinScale(plottingMetadata.getColorScaleRange().getLow());
         setMaxScale(plottingMetadata.getColorScaleRange().getHigh());
 
@@ -485,8 +485,8 @@ public class PaletteSelectorWidget extends ScreenAnnotation implements SelectLis
      * Recalculates the colour scheme.
      */
     private void setupColourScheme() {
-        ColourScale colourScale = new ColourScale(Extents.newExtent(minScale, maxScale), logScaling);
-        colourScheme = new SegmentColourScheme(colourScale, belowMinColour, aboveMaxColour,
+        ScaleRange scaleRange = new ScaleRange(Extents.newExtent(minScale, maxScale), logScaling);
+        colourScheme = new SegmentColourScheme(scaleRange, belowMinColour, aboveMaxColour,
                 TRANSPARENT_COLOR, paletteName, numColourBands);
     }
 

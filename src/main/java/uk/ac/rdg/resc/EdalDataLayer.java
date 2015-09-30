@@ -33,9 +33,8 @@ import java.awt.image.BufferedImage;
 import org.joda.time.DateTime;
 
 import uk.ac.rdg.resc.edal.domain.Extent;
+import uk.ac.rdg.resc.edal.graphics.style.util.PlottingStyleParameters;
 import uk.ac.rdg.resc.edal.metadata.VariableMetadata;
-import uk.ac.rdg.resc.edal.ncwms.config.NcwmsVariable;
-import uk.ac.rdg.resc.edal.wms.WmsLayerMetadata;
 import uk.ac.rdg.resc.widgets.PaletteSelectorWidget.PaletteSelectionHandler;
 
 /**
@@ -84,10 +83,10 @@ public interface EdalDataLayer extends PaletteSelectionHandler, Layer {
     public VariableMetadata getVariableMetadata();
 
     /**
-     * @return The {@link WmsLayerMetadata} information which applies to the
+     * @return The {@link PlottingStyleParameters} information which applies to the
      *         currently selected layer
      */
-    public NcwmsVariable getPlottingMetadata();
+    public PlottingStyleParameters getPlottingMetadata();
 
     /**
      * Returns a legend representing the data colour scale
