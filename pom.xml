@@ -7,7 +7,7 @@
         <version>7</version> </parent> -->
     <modelVersion>4.0.0</modelVersion>
     <groupId>uk.ac.rdg.resc</groupId>
-    <version>0.1-SNAPSHOT</version>
+    <version>1.0</version>
     <artifactId>edal-multiglobe-desktop</artifactId>
     <name>EDAL Multiglobe Desktop Client</name>
     <packaging>jar</packaging>
